@@ -32,6 +32,14 @@ class NewsContentTests(unittest.TestCase):
         title = "Doanh nghiệp công bố ngày chốt quyền cổ tức"
         self.assertEqual(summary_sentences({"title": title}), [title])
 
+    def test_utf8_bytes_preserve_vietnamese(self):
+        document = f'<meta charset="utf-8"><article><p>{ARTICLE}</p></article>'
+        self.assertEqual(extract_article(document.encode('utf-8')), ARTICLE)
+
+    def test_unrelated_publisher_description_is_rejected(self):
+        document = '<meta property="og:description" content="Chuyến thăm chính thức tại Paris của đoàn đại biểu.">'
+        self.assertEqual(extract_article(document, title='FPT phát hành cổ phiếu thưởng'), '')
+
     def test_structured_article_body_survives_script_removal(self):
         document = '<script type="application/ld+json">' + json.dumps({"@graph": [{"articleBody": ARTICLE}]}) + '</script>'
         self.assertEqual(extract_article(document), ARTICLE)

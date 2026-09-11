@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 
-def extract_article(document):
+def extract_article(document, title=""):
     soup = BeautifulSoup(document, "html.parser")
     structured = []
 
@@ -47,7 +47,13 @@ def extract_article(document):
     # A publisher description is still useful evidence; don't collect unrelated
     # page-wide paragraphs from navigation, sign-in or consent screens.
     description = soup.select_one('meta[property="og:description"], meta[name="description"]')
-    return description.get("content", "").strip() if description else ""
+    text = description.get("content", "").strip() if description else ""
+    if title and text:
+        title_words = set(re.findall(r"\w{3,}", title.lower()))
+        content_words = set(re.findall(r"\w{3,}", text.lower()))
+        if len(title_words & content_words) < 2:
+            return ""
+    return text
 
 
 def summary_sentences(item, detail=False):

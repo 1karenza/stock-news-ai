@@ -145,7 +145,7 @@ def resolve_article_url(url):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_article_text(url: str) -> str:
+def fetch_article_text(url: str, title: str = "") -> str:
     if not url:
         return ""
 
@@ -161,7 +161,9 @@ def fetch_article_text(url: str) -> str:
         if r.status_code != 200:
             return ""
 
-        return extract_article(r.text)
+        # Let the HTML parser detect the declared charset from raw bytes.
+        # requests.text defaults to Latin-1 on some UTF-8 Vietnamese sites.
+        return extract_article(r.content, title=title)
     except Exception:
         return ""
 
@@ -307,7 +309,7 @@ def merge_articles(all_news, watched_tickers):
 
 
 def process_article(item, use_ai=False, model="gpt-5.6-luna"):
-    article_text = fetch_article_text(item["url"])
+    article_text = fetch_article_text(item["url"], item["title"])
     item["article_text"] = article_text
 
     if use_ai and os.getenv("OPENAI_API_KEY", "").strip():
