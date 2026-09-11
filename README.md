@@ -41,7 +41,7 @@ Sau khi sửa code, chạy thử bằng `streamlit run app.py` hoặc
 ```powershell
 git status
 git diff
-git add app.py news_content.py assets requirements.txt README.md .gitignore .streamlit/config.toml
+git add app.py news_content.py news_fetch.py assets requirements.txt README.md .gitignore .streamlit/config.toml
 git diff --cached
 git commit -m "Update dashboard"
 git push origin main

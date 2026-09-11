@@ -102,9 +102,11 @@ def news_table(rows):
         link = (f'<a href="{html.escape(url, quote=True)}" target="_blank" rel="noopener noreferrer">Mở bài ↗</a>'
                 if urlparse(url).scheme in ("http", "https") else "—")
         esc = lambda key: html.escape(str(row[key]))
+        source_note = ('<div class="small-muted">Chưa tải được bài gốc</div>'
+                       if row.get("Tình trạng nguồn") == "Chưa tải được bài gốc" else '')
         cells.append(f'<tr><td data-label="Ngày / Mã"><strong>{esc("Mã CK")}</strong><br>{esc("Ngày")}</td>'
                      f'<td data-label="Tóm tắt thông tin" class="news-summary">{esc("Tóm tắt thông tin")}</td>'
-                     f'<td data-label="Nguồn / Loại tin">{esc("Source")}<br><span class="small-muted">{esc("Loại tin")}</span><br>{link}</td></tr>')
+                     f'<td data-label="Nguồn / Loại tin">{esc("Source")}<br><span class="small-muted">{esc("Loại tin")}</span><br>{link}{source_note}</td></tr>')
     return ('<div class="news-table-wrap"><table class="news-table"><caption>Bảng tổng hợp tin chứng khoán</caption>'
             '<colgroup><col style="width:12%"><col style="width:68%"><col style="width:20%"></colgroup>'
             '<thead><tr><th scope="col">Ngày / Mã</th><th scope="col">Tóm tắt thông tin</th>'

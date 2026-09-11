@@ -3,7 +3,7 @@ import re
 import html
 import calendar
 from datetime import datetime, timezone, timedelta
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus
 
 import feedparser
 import pandas as pd
@@ -11,8 +11,8 @@ import requests
 import streamlit as st
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from googlenewsdecoder import gnewsdecoder
-from news_content import extract_article, summary_sentences, news_table
+from news_content import summary_sentences, news_table
+from news_fetch import ArticleUnavailable, read_source_article
 
 load_dotenv()
 
@@ -131,40 +131,15 @@ def fetch_google_news(ticker: str, days: int = 7, max_items: int = 20):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def resolve_article_url(url):
-    if urlparse(url).hostname != "news.google.com":
-        return url
-    try:
-        result = gnewsdecoder(url, interval=1)
-        decoded = result.get("decoded_url", "")
-        if result.get("status") and urlparse(decoded).scheme in ("http", "https"):
-            return decoded
-    except Exception:
-        pass
-    return url
+def cached_article_text(url: str, title: str = "") -> str:
+    # Exceptions are not cached: a failed request must be retried next time.
+    return read_source_article(url, title)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_article_text(url: str, title: str = "") -> str:
-    if not url:
-        return ""
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 Chrome/152 Safari/537.36"
-    }
     try:
-        url = resolve_article_url(url)
-        if urlparse(url).hostname == "news.google.com":
-            return ""
-        r = requests.get(url, headers=headers, timeout=10)
-        if r.status_code != 200:
-            return ""
-
-        # Let the HTML parser detect the declared charset from raw bytes.
-        # requests.text defaults to Latin-1 on some UTF-8 Vietnamese sites.
-        return extract_article(r.content, title=title)
-    except Exception:
+        return cached_article_text(url, title)
+    except ArticleUnavailable:
         return ""
 
 
@@ -327,8 +302,6 @@ def process_article(item, use_ai=False, model="gpt-5.6-luna"):
 def make_table_row(item):
     body = f"{item['title']} {item['summary']} {item.get('article_text','')}"
     table_summary = " ".join(summary_sentences(item))
-    if not item.get("article_text"):
-        table_summary += " (Chỉ có tiêu đề/mô tả nguồn; chưa đọc được nội dung bài gốc.)"
 
     return {
         "Ngày": item["date"],
@@ -337,6 +310,7 @@ def make_table_row(item):
         "Source": item["source"],
         "Loại tin": classify_news(body),
         "Đọc tin gốc": item["url"],
+        "Tình trạng nguồn": "Đã tải nội dung" if item.get("article_text") else "Chưa tải được bài gốc",
     }
 
 
@@ -582,6 +556,17 @@ with tab_news:
         st.session_state.merged_news = processed
 
     merged = st.session_state.merged_news
+
+    missing_articles = [item for item in merged if not item.get("article_text")]
+    if missing_articles:
+        st.caption(f"{len(missing_articles)} bài chưa tải được nội dung gốc. Các bài này đang hiển thị tiêu đề/mô tả nguồn.")
+        if st.button("Tải lại các bài còn thiếu  ↻", key="retry_missing_articles"):
+            retry_progress = st.progress(0, text="Đang tải lại nội dung bài gốc…")
+            for index, item in enumerate(missing_articles):
+                process_article(item, use_ai, model)
+                retry_progress.progress((index + 1) / len(missing_articles))
+            retry_progress.empty()
+            st.rerun()
 
     if not tickers:
         st.warning("Nhập ít nhất một mã cổ phiếu.")
