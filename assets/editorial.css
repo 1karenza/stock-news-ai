@@ -124,6 +124,24 @@ button:disabled { opacity: .55; transform: none !important; }
 .quick-view, .summary-box, .bond-box { padding: 20px; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; color: var(--ink); }
 .quick-view { border-left: 3px solid var(--rose); margin: 1rem 0; }
 .small-muted { color: var(--muted); }
+.news-table-wrap { width: 100%; margin-bottom: 1.2rem; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.news-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 15px; }
+.news-table caption { text-align: left; padding: 14px 18px; color: var(--muted); font-size: 13px; }
+.news-table th { text-align: left; background: var(--soft); font-weight: 700; }
+.news-table th, .news-table td { padding: 18px; vertical-align: top; border-bottom: 1px solid var(--line); white-space: normal; overflow-wrap: anywhere; line-height: 1.65; }
+.news-table tbody tr:last-child td { border-bottom: 0; }
+.news-table tbody tr { transition: background 300ms var(--ease); }
+.news-table tbody tr:hover { background: rgba(228,164,189,.08); }
+.news-table td.news-summary { font-size: 16px; color: var(--ink); }
+.article-summary { width: 100%; padding-left: 1.3rem; margin: .6rem 0 1rem; }
+.article-summary li { padding-left: .25rem; margin-bottom: .8rem; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .news-table colgroup, .news-table thead { display: none; }
+  .news-table, .news-table tbody, .news-table tr, .news-table td { display: block; width: 100%; }
+  .news-table tr { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .news-table td { padding: 8px 16px; border: 0; }
+  .news-table td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+}
 [data-testid="stAlert"] { border-radius: 12px; }
 [data-testid="stAlert"][data-baseweb="notification"] { border: 1px solid var(--line); }
 [data-testid="stProgress"] [role="progressbar"] { accent-color: var(--rose-ink); }
