@@ -33,7 +33,7 @@ Double-click START_HERE_WINDOWS.bat
 
 Folder local được liên kết với https://github.com/1karenza/stock-news-ai,
 nhánh `main`. Streamlit Cloud dùng file `app.py` tại root repo.
-Production: https://stock-news-nhom.streamlit.app
+Production: https://stock-news-kngan.streamlit.app
 
 Sau khi sửa code, chạy thử bằng `streamlit run app.py` hoặc
 `START_HERE_WINDOWS.bat`. Mở terminal tại folder này rồi chạy:
