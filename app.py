@@ -22,55 +22,18 @@ except Exception:
 
 st.set_page_config(
     page_title="Stock News AI Dashboard",
-    page_icon="📈",
+    page_icon="✳",
     layout="wide",
 )
 
 # ---------- STYLE ----------
-st.markdown("""
-<style>
-.block-container {padding-top: 1.2rem; padding-bottom: 2rem;}
-[data-testid="stSidebar"] {background: #f8fafc;}
-.dashboard-title {font-size: 2.1rem; font-weight: 800; margin-bottom: 0.2rem;}
-.dashboard-sub {color:#64748b; margin-bottom: 1rem;}
-.metric-card {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 16px 18px;
-    box-shadow: 0 2px 10px rgba(15,23,42,.04);
-}
-.badge {
-    display:inline-block;
-    padding:4px 9px;
-    border-radius:999px;
-    font-size:.82rem;
-    font-weight:700;
-    background:#eff6ff;
-    color:#1d4ed8;
-}
-.small-muted {color:#64748b;font-size:.88rem;}
-.summary-box {
-    background:#f8fafc;
-    border:1px solid #e2e8f0;
-    border-radius:14px;
-    padding:14px 16px;
-}
-.quick-view {
-    background:#eff6ff;
-    border:1px solid #dbeafe;
-    border-radius:12px;
-    padding:12px 14px;
-}
-.bond-box {
-    background:#fff;
-    border:1px solid #e2e8f0;
-    border-radius:14px;
-    padding:14px;
-}
-</style>
-""", unsafe_allow_html=True)
+# Resolve assets from the entrypoint so local and Streamlit Cloud use the same UI.
+from pathlib import Path
 
+st.markdown(
+    "<style>" + (Path(__file__).parent / "assets" / "editorial.css").read_text(encoding="utf-8") + "</style>",
+    unsafe_allow_html=True,
+)
 
 COMPANY_NAMES = {
     "FPT": "CTCP FPT", "SSI": "Chứng khoán SSI", "VIC": "Vingroup",
@@ -548,13 +511,24 @@ BOND_PRESETS = {
 }
 
 
-st.markdown('<div class="dashboard-title">📈 Stock News & Bond Analytics</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="dashboard-sub">Theo dõi tin chứng khoán và định giá trái phiếu trong cùng một dashboard</div>',
+    '''<div class="masthead">
+    <div class="wordmark"><span aria-hidden="true">✳</span>stock news<span style="margin:0">.</span></div>
+    <div class="edition">The market journal &nbsp; / &nbsp; Vietnam</div>
+    </div>
+    <section class="editorial-hero">
+      <div><div class="eyebrow">A little clarity. Every day.</div>
+      <h1><span class="hero-line">Thị trường.</span><span class="hero-line">Góc nhìn riêng.</span></h1>
+      <p class="hero-copy">Đọc những chuyển động mới. Hiểu câu chuyện sau con số.
+      Không gian dành cho tin chứng khoán &amp; định giá trái phiếu.</p></div>
+      <div class="hero-art" aria-hidden="true"><div class="orbit"></div>
+      <div class="orbit second"></div><div class="hero-flower">✳</div>
+      <div class="art-note">a softer look at numbers ↗</div></div>
+    </section>''',
     unsafe_allow_html=True
 )
 
-tab_news, tab_bond = st.tabs(["📰 Stock News", "💵 Bond Valuation"])
+tab_news, tab_bond = st.tabs(["01  /  Stock News", "02  /  Bond Valuation"])
 
 
 # ============================================================
@@ -562,14 +536,17 @@ tab_news, tab_bond = st.tabs(["📰 Stock News", "💵 Bond Valuation"])
 # ============================================================
 with tab_news:
     with st.sidebar:
-        st.header("Stock News")
+        st.markdown('''<div class="sidebar-brand"><div class="wordmark"><span aria-hidden="true">✳</span>the watchlist.</div></div>
+        <div class="eyebrow">Your daily edit</div>
+        <div class="sidebar-heading">Điểm tin riêng.</div>
+        <p class="sidebar-note">Chọn mã bạn quan tâm.<br>Để những câu chuyện tìm đến bạn.</p>''', unsafe_allow_html=True)
         ticker_text = st.text_input(
             "Mã cổ phiếu",
             value="FPT, TCB, VIC, VHM, PVS",
             placeholder="VD: FPT, SSI, VCB",
             key="news_tickers",
         )
-        days = st.selectbox("Khoảng tin", [1, 3, 7, 14, 30], index=2, key="news_days")
+        days = st.selectbox("Khoảng tin", [1, 3, 7, 14, 30], index=2, format_func=lambda value: f"{value} ngày gần nhất", key="news_days")
         max_items = st.slider("Số bài tối đa / mã", 5, 30, 12, 1, key="news_max")
         use_ai = st.toggle("Dùng AI để tóm tắt sâu", value=False, key="news_ai")
         model = st.text_input(
@@ -578,7 +555,8 @@ with tab_news:
             disabled=not use_ai,
             key="news_model",
         )
-        run = st.button("🔎 Quét và phân tích", type="primary", use_container_width=True, key="news_run")
+        run = st.button("Quét và phân tích  ↗", type="primary", use_container_width=True, key="news_run")
+        st.markdown('<div class="sidebar-footer"><span class="eyebrow">Made for perspective</span><br>Tin từ Google News · Tóm tắt theo yêu cầu</div>', unsafe_allow_html=True)
 
     tickers = []
     for part in ticker_text.split(","):
@@ -589,11 +567,18 @@ with tab_news:
     if "merged_news" not in st.session_state:
         st.session_state.merged_news = []
 
+    st.markdown('<div class="section-heading"><h2>Bản tin của bạn.</h2><span class="eyebrow">01 / The news edit</span></div>', unsafe_allow_html=True)
+    st.markdown('<p class="section-copy">Những tin đáng chú ý, được gom lại trong một góc nhìn.</p>', unsafe_allow_html=True)
+
     if run and tickers:
         all_news = []
-        with st.spinner("Đang lấy tin..."):
+        loading = st.empty()
+        loading.markdown('<div class="loading-note" role="status"><i></i><i></i><i></i> Đang tìm những câu chuyện mới…</div>', unsafe_allow_html=True)
+        try:
             for ticker in tickers:
                 all_news.extend(fetch_google_news(ticker, days, max_items))
+        finally:
+            loading.empty()
 
         merged = merge_articles(all_news, tickers)
 
@@ -615,7 +600,21 @@ with tab_news:
     if not tickers:
         st.warning("Nhập ít nhất một mã cổ phiếu.")
     elif not merged:
-        st.info("Nhấn **Quét và phân tích** để tạo dashboard.")
+        if run:
+            st.info("Chưa tìm thấy tin trong khoảng thời gian này. Thử mở rộng khoảng tin hoặc đổi mã cổ phiếu.")
+        chips = "".join(f'<span class="ticker-chip">{html.escape(ticker)}</span>' for ticker in tickers)
+        st.markdown(f'''<section class="empty-editorial">
+        <span class="empty-star" aria-hidden="true">✧</span>
+        <div class="eyebrow">Your next perspective</div>
+        <h3>Mỗi mã cổ phiếu,<br>một câu chuyện.</h3>
+        <p>Danh sách theo dõi đã sẵn sàng. Nhấn <strong>Quét và phân tích</strong>
+        ở bảng điều khiển để bắt đầu bản tin của bạn.</p>
+        <div class="watchlist">{chips}</div></section>
+        <div class="workflow-grid">
+        <article class="workflow-card"><span class="step">01 / DISCOVER</span><h4>Chọn điều quan tâm.</h4><p>Theo dõi nhiều mã cùng lúc, với khoảng tin phù hợp nhịp đọc của bạn.</p></article>
+        <article class="workflow-card"><span class="step">02 / UNDERSTAND</span><h4>Đọc sâu hơn một chút.</h4><p>Tóm tắt, phân loại và góc nhìn sơ bộ. Luôn có đường dẫn về bài gốc.</p></article>
+        <article class="workflow-card"><span class="step">03 / EXPLORE</span><h4>Hiểu từng con số.</h4><p>Khám phá giá, lợi suất và dòng tiền trong tab Bond Valuation.</p></article>
+        </div>''', unsafe_allow_html=True)
     else:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Tin đã quét", len(merged))
@@ -623,7 +622,7 @@ with tab_news:
         c3.metric("Tin trái phiếu", sum(1 for x in merged if x.get("bond_info", "-") != "-"))
         c4.metric("Nguồn báo", len(set(x["source"] for x in merged)))
 
-        st.markdown("### 📰 Tin mới đáng chú ý")
+        st.markdown("### Những chuyển động mới")
         overview_df = pd.DataFrame([make_table_row(x) for x in merged])
 
         st.dataframe(
@@ -645,7 +644,7 @@ with tab_news:
         )
 
         st.download_button(
-            "⬇️ Tải bảng tin CSV",
+            "Tải bảng tin CSV  ↓",
             data=overview_df.to_csv(index=False).encode("utf-8-sig"),
             file_name="stock_news_dashboard.csv",
             mime="text/csv",
@@ -653,7 +652,7 @@ with tab_news:
         )
 
         st.divider()
-        st.markdown("### 🔎 Chi tiết từng tin")
+        st.markdown("### Sau mỗi dòng tin.")
 
         for i, item in enumerate(merged, start=1):
             tickers_text = ", ".join(sorted(item["tickers"]))
@@ -687,15 +686,15 @@ with tab_news:
                             )
 
                     st.markdown(
-                        f'<div class="quick-view"><b>📈 Góc nhìn nhanh:</b> {quick}</div>',
+                        f'<div class="quick-view"><b>Góc nhìn nhanh:</b> {html.escape(quick)}</div>',
                         unsafe_allow_html=True
                     )
 
                     if item["url"]:
-                        st.link_button("📰 Đọc tin gốc", item["url"])
+                        st.link_button("Đọc tin gốc  ↗", item["url"])
 
                 with right:
-                    st.markdown("**💵 Thông tin trái phiếu (nếu có)**")
+                    st.markdown("**Thông tin trái phiếu (nếu có)**")
                     bond = item.get("bond_info", "-")
                     if bond == "-":
                         st.write("Không có thông tin trái phiếu rõ ràng trong bài này.")
@@ -708,14 +707,14 @@ with tab_news:
 # TAB 2: BOND VALUATION
 # ============================================================
 with tab_bond:
-    st.markdown("### 💵 Định giá trái phiếu")
+    st.markdown('<div class="section-heading"><h2>Giá trị qua con số.</h2><span class="eyebrow">02 / Bond studio</span></div>', unsafe_allow_html=True)
     st.caption(
         "Nhập dữ liệu trái phiếu để tính giá lý thuyết, YTM, premium/discount, "
         "duration và bảng dòng tiền."
     )
 
     preset_name = st.selectbox(
-        "Chọn dữ liệu mẫu để test nhanh",
+        "Bắt đầu với một kịch bản",
         list(BOND_PRESETS.keys()),
         index=1,
         key="bond_preset",
@@ -766,7 +765,7 @@ with tab_bond:
         )
 
         submitted = st.form_submit_button(
-            "🧮 Tính định giá",
+            "Khám phá định giá  ↗",
             type="primary",
             use_container_width=True
         )
@@ -806,7 +805,7 @@ with tab_bond:
             "Không giải được YTM với bộ dữ liệu hiện tại"
         )
 
-    st.markdown("#### Kết quả")
+    st.markdown("### Bức tranh định giá.")
     k1, k2, k3, k4 = st.columns(4)
 
     if calc_mode == "Tính giá lý thuyết":
@@ -858,7 +857,7 @@ with tab_bond:
     )
 
     st.download_button(
-        "⬇️ Tải bảng cash flow CSV",
+        "Tải bảng dòng tiền CSV  ↓",
         data=cashflow_df.to_csv(index=False).encode("utf-8-sig"),
         file_name=f"{bond_code}_cashflows.csv",
         mime="text/csv",
@@ -873,6 +872,7 @@ with tab_bond:
         "- **Modified Duration**: xấp xỉ % thay đổi giá khi yield thay đổi 1 điểm phần trăm."
     )
 
+st.markdown('<div class="page-footer"><span class="wordmark">stock news.</span><span class="eyebrow">Stay curious. Read thoughtfully.</span></div>', unsafe_allow_html=True)
 st.caption(
     "⚠️ Công cụ phục vụ học tập/phân tích. Bond Valuation đang giả định trái phiếu coupon cố định, "
     "dòng tiền đều và không xét default risk, call/put option, thuế hay accrued interest."
