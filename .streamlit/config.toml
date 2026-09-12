@@ -1,13 +1,14 @@
 [theme]
 base = "light"
-primaryColor = "#88465F"
-backgroundColor = "#FDF8F3"
-secondaryBackgroundColor = "#F5F0EB"
-textColor = "#262626"
-font = "League Spartan:https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800;900&display=swap"
+primaryColor = "#F4C95D"
+backgroundColor = "#FFF9E9"
+secondaryBackgroundColor = "#FFF3D2"
+textColor = "#2B2924"
+font = "Be Vietnam Pro:https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"
 
 [server]
 headless = true
 
 [browser]
 gatherUsageStats = false
+
