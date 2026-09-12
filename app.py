@@ -24,7 +24,7 @@ except Exception:
 
 st.set_page_config(
     page_title="Stock News AI Dashboard",
-    page_icon="✳",
+    page_icon="☀️",
     layout="wide",
 )
 
@@ -307,6 +307,7 @@ def make_table_row(item):
         "Ngày": item["date"],
         "Mã CK": ", ".join(sorted(item["tickers"])),
         "Tóm tắt thông tin": table_summary,
+        "Định giá trái phiếu": item.get("bond_info", "-"),
         "Source": item["source"],
         "Loại tin": classify_news(body),
         "Đọc tin gốc": item["url"],
@@ -439,6 +440,155 @@ def fmt_pct(x):
     return f"{x*100:.2f}%".replace(".", ",")
 
 
+def bond_investment_assessment(
+    fair_price,
+    market_price,
+    ytm,
+    required_yield,
+    mod_duration,
+    credit_rating="Không rõ",
+    liquidity="Không rõ",
+    secured="Không rõ",
+):
+    """Create a transparent, non-personalized bond attractiveness assessment."""
+    score = 0
+    reasons = []
+    risks = []
+
+    # 1) Valuation: 35 pts
+    valuation_gap = (fair_price / market_price - 1) if market_price > 0 else 0
+    if valuation_gap >= 0.05:
+        valuation_pts = 35
+        reasons.append(f"Giá thị trường thấp hơn giá lý thuyết khoảng {valuation_gap*100:.2f}%.")
+    elif valuation_gap >= 0.02:
+        valuation_pts = 29
+        reasons.append(f"Giá thị trường đang thấp hơn giá lý thuyết khoảng {valuation_gap*100:.2f}%.")
+    elif valuation_gap >= 0:
+        valuation_pts = 23
+        reasons.append("Giá thị trường xấp xỉ nhưng vẫn thấp hơn giá lý thuyết.")
+    elif valuation_gap >= -0.02:
+        valuation_pts = 16
+        risks.append(f"Giá thị trường cao hơn giá lý thuyết khoảng {abs(valuation_gap)*100:.2f}%.")
+    else:
+        valuation_pts = 7
+        risks.append(f"Giá thị trường cao hơn giá lý thuyết khoảng {abs(valuation_gap)*100:.2f}%, biên an toàn thấp.")
+    score += valuation_pts
+
+    # 2) Yield vs hurdle rate: 25 pts
+    if ytm is None:
+        yield_pts = 8
+        risks.append("Chưa tính được YTM từ giá thị trường.")
+    else:
+        spread = ytm - required_yield
+        if spread >= 0.01:
+            yield_pts = 25
+            reasons.append(f"YTM cao hơn mức lợi suất yêu cầu khoảng {spread*100:.2f} điểm %. ")
+        elif spread >= 0.003:
+            yield_pts = 21
+            reasons.append(f"YTM nhỉnh hơn mức lợi suất yêu cầu khoảng {spread*100:.2f} điểm %.")
+        elif spread >= 0:
+            yield_pts = 17
+            reasons.append("YTM đáp ứng xấp xỉ mức lợi suất yêu cầu.")
+        elif spread >= -0.005:
+            yield_pts = 11
+            risks.append(f"YTM thấp hơn mức lợi suất yêu cầu khoảng {abs(spread)*100:.2f} điểm %.")
+        else:
+            yield_pts = 5
+            risks.append(f"YTM thấp hơn đáng kể mức lợi suất yêu cầu khoảng {abs(spread)*100:.2f} điểm %.")
+    score += yield_pts
+
+    # 3) Credit quality: 25 pts
+    credit_points = {
+        "AAA": 25,
+        "AA": 22,
+        "A": 18,
+        "BBB": 14,
+        "BB": 8,
+        "B hoặc thấp hơn": 3,
+        "Không rõ": 8,
+    }
+    score += credit_points.get(credit_rating, 8)
+    if credit_rating in {"AAA", "AA", "A"}:
+        reasons.append(f"Xếp hạng tín nhiệm nhập vào ở mức {credit_rating}.")
+    elif credit_rating in {"BBB", "BB", "B hoặc thấp hơn"}:
+        risks.append(f"Xếp hạng tín nhiệm {credit_rating} làm rủi ro tín dụng cao hơn.")
+    else:
+        risks.append("Chưa có dữ liệu xếp hạng tín nhiệm của tổ chức phát hành.")
+
+    # 4) Liquidity: 10 pts
+    liquidity_points = {"Cao": 10, "Trung bình": 7, "Thấp": 3, "Không rõ": 5}
+    score += liquidity_points.get(liquidity, 5)
+    if liquidity == "Cao":
+        reasons.append("Thanh khoản được đánh giá cao.")
+    elif liquidity == "Thấp":
+        risks.append("Thanh khoản thấp có thể khiến việc bán trước đáo hạn khó hơn.")
+    elif liquidity == "Không rõ":
+        risks.append("Chưa có dữ liệu thanh khoản thứ cấp.")
+
+    # 5) Interest-rate risk: 5 pts
+    if mod_duration is None:
+        duration_pts = 2
+    elif mod_duration <= 3:
+        duration_pts = 5
+        reasons.append(f"Modified Duration {mod_duration:.2f} ở mức tương đối thấp.")
+    elif mod_duration <= 5:
+        duration_pts = 3
+        risks.append(f"Modified Duration {mod_duration:.2f}: độ nhạy với lãi suất ở mức trung bình.")
+    else:
+        duration_pts = 1
+        risks.append(f"Modified Duration {mod_duration:.2f}: giá khá nhạy với biến động lãi suất.")
+    score += duration_pts
+
+    # Structural protection is shown as a qualitative flag only, not double-counted.
+    if secured == "Có tài sản bảo đảm":
+        reasons.append("Có tài sản bảo đảm theo dữ liệu người dùng nhập.")
+    elif secured == "Không tài sản bảo đảm":
+        risks.append("Không có tài sản bảo đảm làm mức bảo vệ nhà đầu tư thấp hơn.")
+    else:
+        risks.append("Chưa rõ tình trạng tài sản bảo đảm.")
+
+    score = max(0, min(100, round(score)))
+    missing_core = credit_rating == "Không rõ" or liquidity == "Không rõ"
+
+    if missing_core:
+        verdict = "CẦN THÊM DỮ LIỆU"
+        level = "warning"
+        conclusion = (
+            "Định giá có thể đang hấp dẫn hoặc không, nhưng chưa đủ cơ sở để kết luận nên đầu tư "
+            "vì còn thiếu ít nhất dữ liệu tín nhiệm hoặc thanh khoản."
+        )
+    elif score >= 75 and credit_rating not in {"BB", "B hoặc thấp hơn"}:
+        verdict = "CÓ THỂ CÂN NHẮC"
+        level = "success"
+        conclusion = (
+            "Các chỉ tiêu định giá và rủi ro đầu vào đang tương đối thuận lợi. "
+            "Có thể đưa trái phiếu vào danh sách cân nhắc sau khi kiểm tra hồ sơ phát hành và sức khỏe tổ chức phát hành."
+        )
+    elif score >= 60:
+        verdict = "CÂN NHẮC CÓ ĐIỀU KIỆN"
+        level = "warning"
+        conclusion = (
+            "Trái phiếu có một số điểm tích cực nhưng biên an toàn chưa đủ rõ. "
+            "Nên kiểm tra kỹ rủi ro tín dụng, thanh khoản và điều khoản trước khi ra quyết định."
+        )
+    else:
+        verdict = "CHƯA HẤP DẪN"
+        level = "error"
+        conclusion = (
+            "Với các giả định hiện tại, mức bù lợi suất/định giá chưa đủ hấp dẫn so với rủi ro đầu vào. "
+            "Nên chờ mức giá hoặc điều kiện tốt hơn, hoặc xem xét lựa chọn khác."
+        )
+
+    return {
+        "score": score,
+        "verdict": verdict,
+        "level": level,
+        "conclusion": conclusion,
+        "reasons": reasons,
+        "risks": risks,
+        "valuation_gap": valuation_gap,
+    }
+
 BOND_PRESETS = {
     "Tự nhập": None,
     "Ví dụ A – Coupon 8%, 5 năm": {
@@ -473,22 +623,20 @@ BOND_PRESETS = {
 
 st.markdown(
     '''<div class="masthead">
-    <div class="wordmark"><span aria-hidden="true">✳</span>stock news<span style="margin:0">.</span></div>
-    <div class="edition">The market journal &nbsp; / &nbsp; Vietnam</div>
+    <div class="wordmark"><span class="brand-monogram" aria-hidden="true">SN</span>STOCK NEWS <span class="brand-ai">AI</span></div>
+    <div class="edition">Nghiên cứu thị trường Việt Nam</div>
     </div>
     <section class="editorial-hero">
-      <div><div class="eyebrow">A little clarity. Every day.</div>
-      <h1><span class="hero-line">Thị trường.</span><span class="hero-line">Góc nhìn riêng.</span></h1>
-      <p class="hero-copy">Đọc những chuyển động mới. Hiểu câu chuyện sau con số.
-      Không gian dành cho tin chứng khoán &amp; định giá trái phiếu.</p></div>
-      <div class="hero-art" aria-hidden="true"><div class="orbit"></div>
-      <div class="orbit second"></div><div class="hero-flower">✳</div>
-      <div class="art-note">a softer look at numbers ↗</div></div>
+      <div><div class="eyebrow">Thông tin &amp; phân tích đầu tư</div>
+      <h1><span class="hero-line">Đọc tin hôm nay.</span><span class="hero-line">Hiểu giá trị dài hạn.</span></h1></div>
+      <div class="hero-brief"><span class="brief-mark" aria-hidden="true">↗</span>
+      <p class="hero-copy">Tổng hợp tin doanh nghiệp, phân tích lợi suất và nhìn rõ rủi ro trái phiếu.</p>
+      <div class="brief-note">Dữ liệu công khai. Góc nhìn có cơ sở.</div></div>
     </section>''',
     unsafe_allow_html=True
 )
 
-tab_news, tab_bond = st.tabs(["01  /  Stock News", "02  /  Bond Valuation"])
+tab_news, tab_bond = st.tabs(["01   Tin doanh nghiệp", "02   Định giá trái phiếu"])
 
 
 # ============================================================
@@ -496,10 +644,9 @@ tab_news, tab_bond = st.tabs(["01  /  Stock News", "02  /  Bond Valuation"])
 # ============================================================
 with tab_news:
     with st.sidebar:
-        st.markdown('''<div class="sidebar-brand"><div class="wordmark"><span aria-hidden="true">✳</span>the watchlist.</div></div>
-        <div class="eyebrow">Your daily edit</div>
-        <div class="sidebar-heading">Điểm tin riêng.</div>
-        <p class="sidebar-note">Chọn mã bạn quan tâm.<br>Để những câu chuyện tìm đến bạn.</p>''', unsafe_allow_html=True)
+        st.markdown('''<div class="sidebar-brand"><span class="sidebar-kicker">KHÔNG GIAN NGHIÊN CỨU</span></div>
+        <div class="sidebar-heading">Danh sách<br>theo dõi</div>
+        <p class="sidebar-note">Chọn doanh nghiệp và khoảng thời gian bạn muốn tìm hiểu.</p>''', unsafe_allow_html=True)
         ticker_text = st.text_input(
             "Mã cổ phiếu",
             value="FPT, TCB, VIC, VHM, PVS",
@@ -509,14 +656,11 @@ with tab_news:
         days = st.selectbox("Khoảng tin", [1, 3, 7, 14, 30], index=2, format_func=lambda value: f"{value} ngày gần nhất", key="news_days")
         max_items = st.slider("Số bài tối đa / mã", 5, 30, 12, 1, key="news_max")
         use_ai = st.toggle("Dùng AI để tóm tắt sâu", value=False, key="news_ai")
-        model = st.text_input(
-            "OpenAI model",
-            value=os.getenv("OPENAI_MODEL", "gpt-5.6-luna"),
-            disabled=not use_ai,
-            key="news_model",
-        )
-        run = st.button("Quét và phân tích  ↗", type="primary", use_container_width=True, key="news_run")
-        st.markdown('<div class="sidebar-footer"><span class="eyebrow">Made for perspective</span><br>Tin từ Google News · Tóm tắt theo yêu cầu</div>', unsafe_allow_html=True)
+        model = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+        if use_ai:
+            model = st.text_input("OpenAI model", value=model, key="news_model")
+        run = st.button("Tổng hợp bản tin  ↗", type="primary", use_container_width=True, key="news_run")
+        st.markdown('<div class="sidebar-footer"><span aria-hidden="true">✧</span> Tin từ Google News<br>Tóm tắt theo yêu cầu · Luôn có bài gốc</div>', unsafe_allow_html=True)
 
     tickers = []
     for part in ticker_text.split(","):
@@ -527,8 +671,8 @@ with tab_news:
     if "merged_news" not in st.session_state:
         st.session_state.merged_news = []
 
-    st.markdown('<div class="section-heading"><h2>Bản tin của bạn.</h2><span class="eyebrow">01 / The news edit</span></div>', unsafe_allow_html=True)
-    st.markdown('<p class="section-copy">Những tin đáng chú ý, được gom lại trong một góc nhìn.</p>', unsafe_allow_html=True)
+    st.markdown('<div class="section-heading"><h2>Tin doanh nghiệp</h2><span class="eyebrow">Tin tức · Số liệu · Sự kiện</span></div>', unsafe_allow_html=True)
+    st.markdown('<p class="section-copy">Theo dõi thông tin liên quan đến các mã trong danh sách của bạn.</p>', unsafe_allow_html=True)
 
     if run and tickers:
         all_news = []
@@ -575,16 +719,16 @@ with tab_news:
             st.info("Chưa tìm thấy tin trong khoảng thời gian này. Thử mở rộng khoảng tin hoặc đổi mã cổ phiếu.")
         chips = "".join(f'<span class="ticker-chip">{html.escape(ticker)}</span>' for ticker in tickers)
         st.markdown(f'''<section class="empty-editorial">
-        <span class="empty-star" aria-hidden="true">✧</span>
-        <div class="eyebrow">Your next perspective</div>
-        <h3>Mỗi mã cổ phiếu,<br>một câu chuyện.</h3>
-        <p>Danh sách theo dõi đã sẵn sàng. Nhấn <strong>Quét và phân tích</strong>
-        ở bảng điều khiển để bắt đầu bản tin của bạn.</p>
+        <span class="empty-star" aria-hidden="true">↗</span>
+        <div class="eyebrow">Bắt đầu nghiên cứu</div>
+        <h3>Bản tin đang chờ bạn chọn.</h3>
+        <p>Nhấn <strong>Tổng hợp bản tin</strong> trong bộ lọc để tìm tin mới,
+        đọc tóm tắt và xem các số liệu đáng chú ý.</p>
         <div class="watchlist">{chips}</div></section>
         <div class="workflow-grid">
-        <article class="workflow-card"><span class="step">01 / DISCOVER</span><h4>Chọn điều quan tâm.</h4><p>Theo dõi nhiều mã cùng lúc, với khoảng tin phù hợp nhịp đọc của bạn.</p></article>
-        <article class="workflow-card"><span class="step">02 / UNDERSTAND</span><h4>Đọc sâu hơn một chút.</h4><p>Tóm tắt, phân loại và góc nhìn sơ bộ. Luôn có đường dẫn về bài gốc.</p></article>
-        <article class="workflow-card"><span class="step">03 / EXPLORE</span><h4>Hiểu từng con số.</h4><p>Khám phá giá, lợi suất và dòng tiền trong tab Bond Valuation.</p></article>
+        <article class="workflow-card"><span class="step">01</span><h4>Theo dõi doanh nghiệp</h4><p>Nhập một hoặc nhiều mã cổ phiếu, cách nhau bằng dấu phẩy.</p></article>
+        <article class="workflow-card"><span class="step">02</span><h4>Đối chiếu thông tin</h4><p>Đọc tóm tắt cùng số liệu và mở bài gốc để kiểm chứng.</p></article>
+        <article class="workflow-card"><span class="step">03</span><h4>Đánh giá trái phiếu</h4><p>So sánh giá, lợi suất và rủi ro trong mục Định giá trái phiếu.</p></article>
         </div>''', unsafe_allow_html=True)
     else:
         c1, c2, c3, c4 = st.columns(4)
@@ -593,7 +737,7 @@ with tab_news:
         c3.metric("Tin trái phiếu", sum(1 for x in merged if x.get("bond_info", "-") != "-"))
         c4.metric("Nguồn báo", len(set(x["source"] for x in merged)))
 
-        st.markdown("### Những chuyển động mới")
+        st.markdown("### Tổng hợp sự kiện")
         overview_df = pd.DataFrame([make_table_row(x) for x in merged])
 
         st.markdown(news_table(overview_df.to_dict("records")), unsafe_allow_html=True)
@@ -607,7 +751,7 @@ with tab_news:
         )
 
         st.divider()
-        st.markdown("### Sau mỗi dòng tin.")
+        st.markdown("### Phân tích từng bài")
 
         for i, item in enumerate(merged, start=1):
             tickers_text = ", ".join(sorted(item["tickers"]))
@@ -644,19 +788,27 @@ with tab_news:
                 if item["url"]:
                     st.link_button("Đọc tin gốc  ↗", item["url"])
 
+                bond = item.get("bond_info", "-")
+                if bond != "-":
+                    st.markdown(
+                        '<div class="bond-box"><span class="eyebrow">Thông tin trái phiếu</span>'
+                        f'<p>{html.escape(bond)}</p></div>', unsafe_allow_html=True,
+                    )
+                    st.caption("Mở mục Định giá trái phiếu để so sánh YTM và giá lý thuyết.")
+
 
 # ============================================================
 # TAB 2: BOND VALUATION
 # ============================================================
 with tab_bond:
-    st.markdown('<div class="section-heading"><h2>Giá trị qua con số.</h2><span class="eyebrow">02 / Bond studio</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-heading"><h2>Hồ sơ trái phiếu</h2><span class="eyebrow">Định giá · Lợi suất · Rủi ro</span></div>', unsafe_allow_html=True)
     st.caption(
         "Nhập dữ liệu trái phiếu để tính giá lý thuyết, YTM, premium/discount, "
         "duration và bảng dòng tiền."
     )
 
     preset_name = st.selectbox(
-        "Bắt đầu với một kịch bản",
+        "Chọn bộ dữ liệu",
         list(BOND_PRESETS.keys()),
         index=1,
         key="bond_preset",
@@ -706,8 +858,27 @@ with tab_bond:
             horizontal=True
         )
 
+        st.markdown("**Thông tin rủi ro để tổng hợp kết luận đầu tư**")
+        r4c1, r4c2, r4c3 = st.columns(3)
+        credit_rating = r4c1.selectbox(
+            "Xếp hạng tín nhiệm",
+            ["Không rõ", "AAA", "AA", "A", "BBB", "BB", "B hoặc thấp hơn"],
+            index=0,
+            help="Nếu chưa có xếp hạng chính thức, để 'Không rõ'."
+        )
+        liquidity = r4c2.selectbox(
+            "Thanh khoản thứ cấp",
+            ["Không rõ", "Cao", "Trung bình", "Thấp"],
+            index=0
+        )
+        secured = r4c3.selectbox(
+            "Tài sản bảo đảm",
+            ["Không rõ", "Có tài sản bảo đảm", "Không tài sản bảo đảm"],
+            index=0
+        )
+
         submitted = st.form_submit_button(
-            "Khám phá định giá  ↗",
+            "Tính định giá & tổng hợp kết luận  ↗",
             type="primary",
             use_container_width=True
         )
@@ -747,7 +918,7 @@ with tab_bond:
             "Không giải được YTM với bộ dữ liệu hiện tại"
         )
 
-    st.markdown("### Bức tranh định giá.")
+    st.markdown("### Kết quả định giá")
     k1, k2, k3, k4 = st.columns(4)
 
     if calc_mode == "Tính giá lý thuyết":
@@ -779,7 +950,55 @@ with tab_bond:
                 f"**{coupon_pct:.2f}%/năm**."
             )
 
-    st.markdown("#### Dòng tiền trái phiếu")
+    assessment = bond_investment_assessment(
+        fair_price=fair_price,
+        market_price=market_price,
+        ytm=ytm,
+        required_yield=required_yield,
+        mod_duration=mod_dur,
+        credit_rating=credit_rating,
+        liquidity=liquidity,
+        secured=secured,
+    )
+
+    st.markdown("### Đánh giá đầu tư")
+    st.markdown(
+        f'''<section class="assessment-panel" data-level="{assessment['level']}"
+        aria-label="Kết luận đầu tư {html.escape(bond_code, quote=True)}">
+        <div><div class="eyebrow">Điểm hấp dẫn</div>
+        <div class="score-number">{assessment['score']}<small>/100</small></div>
+        <div class="score-track" role="meter" aria-label="Điểm hấp dẫn"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="{assessment['score']}">
+        <span style="width:{assessment['score']}%"></span></div></div>
+        <div><div class="eyebrow"><span class="signal-dot" aria-hidden="true"></span>
+        {html.escape(bond_code)} · Kết luận sơ bộ</div>
+        <h3>{assessment['verdict']}</h3><p>{assessment['conclusion']}</p></div>
+        </section>''', unsafe_allow_html=True,
+    )
+
+    c_pos, c_risk = st.columns(2)
+    with c_pos:
+        st.markdown("**✅ Điểm hỗ trợ**")
+        if assessment["reasons"]:
+            for x in assessment["reasons"]:
+                st.markdown(f"- {x}")
+        else:
+            st.write("Chưa có điểm hỗ trợ nổi bật từ dữ liệu hiện tại.")
+
+    with c_risk:
+        st.markdown("**⚠️ Rủi ro / dữ liệu cần kiểm tra**")
+        if assessment["risks"]:
+            for x in assessment["risks"]:
+                st.markdown(f"- {x}")
+        else:
+            st.write("Chưa phát hiện cảnh báo lớn từ các dữ liệu đã nhập.")
+
+    st.caption(
+        "Điểm 0–100 là điểm hấp dẫn phân tích của mô hình, không phải xếp hạng tín nhiệm chính thức. "
+        "Kết luận dựa trên giá/YTM, duration và các thông tin rủi ro bạn nhập; không thay thế thẩm định tổ chức phát hành."
+    )
+
+    st.markdown("### Lịch thanh toán & dòng tiền")
     cashflow_df = bond_cashflows(
         face_value, coupon_rate, years, m,
         required_yield if calc_mode == "Tính giá lý thuyết" else (ytm or required_yield)
@@ -806,7 +1025,7 @@ with tab_bond:
         key="bond_csv",
     )
 
-    st.markdown("#### Cách đọc nhanh")
+    st.markdown("#### Giải thích chỉ số")
     st.write(
         "- **Giá lý thuyết**: PV của toàn bộ coupon + mệnh giá chiết khấu theo required yield.\n"
         "- **YTM**: mức lợi suất làm PV dòng tiền bằng đúng giá thị trường.\n"
@@ -814,8 +1033,9 @@ with tab_bond:
         "- **Modified Duration**: xấp xỉ % thay đổi giá khi yield thay đổi 1 điểm phần trăm."
     )
 
-st.markdown('<div class="page-footer"><span class="wordmark">stock news.</span><span class="eyebrow">Stay curious. Read thoughtfully.</span></div>', unsafe_allow_html=True)
+st.markdown('<div class="page-footer"><span class="wordmark">STOCK NEWS AI</span><span class="eyebrow">Tin doanh nghiệp &amp; phân tích trái phiếu</span></div>', unsafe_allow_html=True)
 st.caption(
-    "⚠️ Công cụ phục vụ học tập/phân tích. Bond Valuation đang giả định trái phiếu coupon cố định, "
-    "dòng tiền đều và không xét default risk, call/put option, thuế hay accrued interest."
+    "⚠️ Công cụ phục vụ học tập/phân tích và sàng lọc sơ bộ, không phải khuyến nghị đầu tư cá nhân. "
+    "Bond Valuation giả định trái phiếu coupon cố định, dòng tiền đều; kết luận đầu tư vẫn cần kiểm tra "
+    "rủi ro tổ chức phát hành, điều khoản pháp lý, call/put option, thuế và accrued interest."
 )
