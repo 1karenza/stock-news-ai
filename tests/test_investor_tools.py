@@ -39,6 +39,9 @@ class EventTests(unittest.TestCase):
         self.assertEqual(classify_event(ARTICLE),"issuance")
         groups=cluster_events([ARTICLE,same,other])
         self.assertEqual(sorted(len(g["articles"]) for g in groups),[1,2])
+        reworded={**ARTICLE,"title":"FPT sắp phát hành 171 triệu cổ phiếu thưởng, vốn điều lệ tăng mạnh"}
+        self.assertEqual(len(cluster_events([ARTICLE,reworded])),1)
+        self.assertEqual(classify_event({"title":"FPT chốt ngày thưởng hơn 171 triệu cổ phiếu","article_text":"Doanh thu và lợi nhuận tăng."}),"issuance")
 
     def test_calendar_html_and_ics_preserve_unicode_without_injection(self):
         event=validate_manual_event({"title":"Cổ tức <script>\nBEGIN:VEVENT", "event_date":"2026-09-22", "tickers":"FPT", "type":"dividends"})

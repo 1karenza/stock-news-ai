@@ -101,6 +101,8 @@ def classify_event(article):
         normalized = fold(text)
         scores = {kind: sum(bool(re.search(r"\b" + re.escape(term) + r"\b", normalized)) for term in terms)
                   for kind, terms in _RULES.items()}
+        if re.search(r"\bthuong\b[^.;]{0,45}\bco phieu\b", normalized):
+            scores["issuance"] += 2
         if max(scores.values(), default=0):
             return max(scores, key=scores.get)
     return "other"
@@ -145,6 +147,13 @@ def _same_event(left, right):
         return False
     if a == b:
         return True
+    # An explicit identical bonus-share quantity is a stronger event anchor
+    # than incidental headline wording; still require the same numeric facts.
+    if classify_event(left) == "issuance":
+        quantity = r"\b(\d+(?:\s+\d+)?\s+(?:trieu|ty)\s+co phieu thuong)\b"
+        match_a, match_b = re.search(quantity, a), re.search(quantity, b)
+        if match_a and match_b and match_a.group(1) == match_b.group(1):
+            return True
     words_a, words_b = set(a.split()), set(b.split())
     overlap = len(words_a & words_b) / max(1, len(words_a | words_b))
     return min(len(words_a), len(words_b)) >= 6 and overlap >= .77 and SequenceMatcher(None, a, b).ratio() >= .88
