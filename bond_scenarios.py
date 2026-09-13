@@ -53,3 +53,40 @@ def scenario_table(bond, shocks=(-1,-.5,0,.5,1)):
                      "Chênh lệch giá": price-base, "Biến động giá (%)": (price/base-1)*100,
                      "Giá / 100 mệnh giá": price/b["face_value"]*100})
     return pd.DataFrame(rows)
+
+
+def comparison_conclusions(comparison):
+    """Describe the plotted +/-1 percentage-point scenarios, not credit quality."""
+    shock_column = "Thay đổi lợi suất (điểm %)"
+    change_column = "Biến động giá (%)"
+    up = comparison.loc[comparison[shock_column] == 1].set_index("Trái phiếu")
+    down = comparison.loc[comparison[shock_column] == -1].set_index("Trái phiếu")
+    if up.empty or set(up.index) != set(down.index):
+        return []
+    losses = -up[change_column]
+    greatest, smallest = losses.max(), losses.min()
+    names = lambda mask: ", ".join(str(name) for name in losses.index[mask])
+    most = names((losses - greatest).abs() < .01)
+    least = names((losses - smallest).abs() < .01)
+    fmt = lambda value: f"{value:.2f}".replace(".", ",")
+    details = "; ".join(
+        f"{name}: tăng {fmt(down.loc[name, change_column])}% khi lợi suất giảm 1 điểm %, "
+        f"giảm {fmt(losses.loc[name])}% khi lợi suất tăng 1 điểm %"
+        for name in up.index
+    )
+    ranking = (
+        "Các trái phiếu có độ nhạy gần tương đương trong kịch bản lợi suất tăng 1 điểm % "
+        "(chênh lệch mức giảm giá dưới 0,01 điểm %)."
+        if greatest - smallest < .01 else
+        f"{most} nhạy hơn với chiều tăng lợi suất, giảm khoảng {fmt(greatest)}%; "
+        f"{least} ít nhạy hơn trong nhóm, giảm khoảng {fmt(smallest)}%."
+    )
+    return [
+        "Giá cả nhóm đi ngược chiều lợi suất: lợi suất tăng thì giá giảm, lợi suất giảm thì giá tăng. "
+        "Mốc 0% trên biểu đồ là mức thay đổi so với giá lý thuyết cơ sở của từng trái phiếu.",
+        details + ".",
+        ranking,
+        "Đây là so sánh rủi ro biến động giá do lợi suất theo thông số bạn nhập. "
+        "Ít nhạy với lợi suất không đồng nghĩa an toàn hơn về khả năng trả nợ; "
+        "biểu đồ chưa đánh giá rủi ro tín dụng, thanh khoản hay đưa ra kết luận nên mua trái phiếu nào.",
+    ]

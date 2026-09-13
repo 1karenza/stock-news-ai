@@ -8,7 +8,7 @@ from streamlit.testing.v1 import AppTest
 from investor_events import (classify_event, cluster_events, extract_event_dates, validate_manual_event,
                              calendar_html, events_ics, official_source)
 from investor_profile import default_profile, validate_profile, article_id, portable_article
-from bond_scenarios import price_at_yield, scenario_table
+from bond_scenarios import price_at_yield, scenario_table, comparison_conclusions
 from market_prices import import_prices, validate_prices, align_news, PriceUnavailable
 
 APP = str(Path(__file__).resolve().parents[1] / "app.py")
@@ -88,6 +88,20 @@ class PriceAndBondTests(unittest.TestCase):
         twice={**BOND,"face_value":200,"market_price":200}
         pd.testing.assert_series_equal(scenario_table(BOND)["Biến động giá (%)"],scenario_table(twice)["Biến động giá (%)"])
 
+    def test_comparison_conclusions_follow_actual_scenarios_and_ties(self):
+        bonds = [dict(BOND, code="VIC", required_yield=.09),
+                 dict(BOND, code="VHM", coupon_rate=.10, payments_per_year=1),
+                 dict(BOND, code="HDB", coupon_rate=.092, years=6, payments_per_year=1, required_yield=.093)]
+        comparison = pd.concat([scenario_table(b) for b in bonds], ignore_index=True)
+        conclusions = comparison_conclusions(comparison)
+        self.assertIn("HDB nhạy hơn", conclusions[2])
+        self.assertIn("VHM ít nhạy hơn", conclusions[2])
+        for name in ("VIC", "VHM", "HDB"):
+            change = -comparison.loc[(comparison["Trái phiếu"] == name) & (comparison["Thay đổi lợi suất (điểm %)"] == 1), "Biến động giá (%)"].iloc[0]
+            self.assertIn(f"{change:.2f}".replace(".", ","), conclusions[1])
+        tied = pd.concat([scenario_table(BOND), scenario_table(dict(BOND, code="B", face_value=200))])
+        self.assertIn("gần tương đương", comparison_conclusions(tied)[2])
+
 
 class WorkspaceTests(unittest.TestCase):
     def test_profile_json_roundtrip_and_isolation(self):
@@ -128,6 +142,7 @@ class WorkspaceTests(unittest.TestCase):
         next(x for x in app.button if x.label=="Tính so sánh").click().run()
         self.assertFalse(app.exception)
         self.assertEqual(len(app.session_state["bond_comparison_result"][1]),10)
+        self.assertTrue(any("Kết luận sơ bộ" in item.value for item in app.markdown))
 
 
 if __name__=="__main__": unittest.main()

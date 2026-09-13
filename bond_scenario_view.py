@@ -1,6 +1,6 @@
 import pandas as pd
 import streamlit as st
-from bond_scenarios import scenario_table, validate_bond
+from bond_scenarios import scenario_table, validate_bond, comparison_conclusions
 
 
 def render_bond_scenarios(current_bond):
@@ -62,6 +62,9 @@ def render_bond_scenarios(current_bond):
     if result and result[0] == edited.to_json():
         comparison = result[1]
         st.line_chart(comparison, x="Thay đổi lợi suất (điểm %)", y="Biến động giá (%)", color="Trái phiếu")
+        st.markdown("#### Kết luận sơ bộ")
+        for conclusion in comparison_conclusions(comparison):
+            st.write(conclusion)
         st.dataframe(comparison.round(3), hide_index=True, width="stretch")
         st.download_button("Xuất bảng so sánh", comparison.to_csv(index=False).encode("utf-8-sig"), "bond-comparison.csv", "text/csv")
     st.caption("Chỉ áp dụng coupon cố định, các kỳ thanh toán đều và dịch chuyển lợi suất song song. Không mô phỏng vỡ nợ, thuế, lãi tích lũy hoặc mua lại trước hạn.")
