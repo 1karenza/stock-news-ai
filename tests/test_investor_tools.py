@@ -121,7 +121,8 @@ class WorkspaceTests(unittest.TestCase):
         app.session_state["merged_news"]=[ARTICLE]
         app.run()
         self.assertFalse(app.exception)
-        self.assertEqual(len(app.tabs),6)
+        self.assertNotIn("02 / Sự kiện", [tab.label for tab in app.tabs])
+        self.assertIn("Định giá một trái phiếu", [tab.label for tab in app.tabs])
         next(x for x in app.text_input if x.label=="Tên danh sách").set_value("Danh mục thử")
         next(x for x in app.text_input if x.label=="Các mã trong danh sách").set_value("FPT, SSI")
         next(x for x in app.button if x.label=="Lưu danh sách").click().run()
@@ -143,6 +144,18 @@ class WorkspaceTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(len(app.session_state["bond_comparison_result"][1]),10)
         self.assertTrue(any("Kết luận sơ bộ" in item.value for item in app.markdown))
+        app.number_input(key="compare_0_0_years").set_value(10).run()
+        self.assertFalse(any("Kết luận sơ bộ" in item.value for item in app.markdown))
+        next(x for x in app.button if x.label=="Tính so sánh").click().run()
+        self.assertTrue(any("Kết luận sơ bộ" in item.value for item in app.markdown))
+        next(x for x in app.button if x.label=="+ Thêm trái phiếu").click().run()
+        self.assertEqual(len(app.session_state.compare_bonds),3)
+        self.assertEqual(app.session_state.compare_bonds.iloc[0]["Kỳ hạn (năm)"],10)
+        app.button(key="compare_1_2_remove").click().run()
+        self.assertEqual(len(app.session_state.compare_bonds),2)
+        next(x for x in app.button if x.label=="Tính kết quả").click().run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any(x.label=="Giá lý thuyết" for x in app.metric))
 
 
 if __name__=="__main__": unittest.main()
