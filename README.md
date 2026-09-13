@@ -1,4 +1,45 @@
-# Stock News AI Dashboard V4
+# Stock News AI — Investor Workspace
+
+Ứng dụng: https://stock-news-kngan.streamlit.app · Repo: `1karenza/stock-news-ai`.
+
+## Năm tính năng dành cho nhà đầu tư
+
+1. **Danh sách & tin lưu**: tạo/cập nhật tối đa 20 nhóm cổ phiếu, áp dụng nhóm từ
+   thanh bên; đánh dấu đã đọc/chưa đọc, lưu tối đa 100 bài, lọc tin mới từ lần xem
+   trước. Hồ sơ và 60 tin gần nhất lưu trong localStorage của trình duyệt, không
+   dùng file hồ sơ chung trên server. JSON sao lưu dùng để chuyển thiết bị.
+2. **Sự kiện**: lọc theo mã và loại sự kiện; gom các tiêu đề gần trùng có cùng mã,
+   số liệu và thời gian gần nhau. Luôn giữ các bài nguồn để đối chiếu.
+3. **Lịch doanh nghiệp**: lịch tháng tách ngày chốt quyền, ngày thanh toán, họp
+   cổ đông và các mốc khác. Chỉ đưa ngày đầy đủ có bằng chứng vào lịch; mốc thiếu
+   năm cần kiểm tra. Có thêm/sửa/xóa mốc của bạn, xuất CSV và ICS. File ICS nhập
+   một lần vào ứng dụng lịch, không tự đồng bộ hay tự nhắc qua email.
+4. **Giá & tin**: tải lịch sử giá ngày qua Yahoo Finance với mã `<TICKER>.VN`,
+   biểu đồ giá/khối lượng và mốc tin. Nguồn có thể trễ, thiếu mã hoặc tạm ngừng;
+   có CSV thay thế (date,close,volume; YYYY-MM-DD; VND; số không có dấu hàng nghìn).
+   Hiển thị thời điểm tải, phiên cuối, nguồn và trạng thái điều chỉnh. Không dùng
+   dữ liệu này để đặt lệnh; tin cùng ngày không chứng minh nguyên nhân biến động.
+5. **Bond Valuation**: giữ công cụ cũ, thêm tính lại giá theo ±0,5/±1 điểm phần
+   trăm và kịch bản riêng; so sánh 2–3 trái phiếu, chuẩn hóa theo % biến động và
+   100 mệnh giá, xuất CSV. Dùng kỳ coupon đều, không mô phỏng rủi ro vỡ nợ.
+
+LocalStorage bị xóa hoặc dùng trình duyệt khác sẽ không còn hồ sơ cũ nếu chưa
+khôi phục JSON. Trình duyệt chặn lưu vẫn dùng được phiên hiện tại và xuất JSON.
+Ngày lịch từ báo chí là dữ liệu cần đối chiếu; tên miền chính thức không đồng
+nghĩa sự kiện đã được xác minh độc lập. Không có tự quét theo giờ trong bản này.
+
+## Kiểm tra
+
+Yêu cầu Streamlit >=1.63. Chạy `python -m pip install -r requirements.txt`, rồi:
+
+```powershell
+python -m unittest discover -s tests -v
+python -m streamlit run app.py
+```
+
+Các module mới: `investor_profile.py`, `investor_events.py`, `event_views.py`,
+`market_prices.py`, `price_view.py`, `bond_scenarios.py`, `bond_scenario_view.py`.
+Khi deploy phải commit đủ các module này và `requirements.txt` cùng `app.py`.
 
 ## Tab 1 — Stock News
 - Quét tin theo mã cổ phiếu.

@@ -30,11 +30,16 @@ def extract_article(document, title=""):
     for tag in soup.select("script, style, noscript, nav, aside, footer, .related-news, .related-articles"):
         tag.decompose()
     candidates = structured[:]
-    for selector in ("[itemprop='articleBody']", ".article-body", ".article-content",
+    for selector in ("[itemprop='articleBody']", ".article-editor", ".mekong-detail-body", ".article-body", ".article-content",
                      ".detail-content", ".content-detail", ".fck_detail", ".entry-content",
                      ".post-content", ".detail__content", "article"):
         for node in soup.select(selector):
             paras = [p.get_text(" ", strip=True) for p in node.select("p")]
+            if selector == "article" and title:
+                terms = set(re.findall(r"\w{3,}", re.sub(r"\s+-\s+[^-]+$", "", title).lower()))
+                words = set(re.findall(r"\w{3,}", node.get_text(" ", strip=True).lower()))
+                if (len(paras) < 3 and len(soup.select("article")) > 1) or len(terms & words) < max(2, len(terms)*.35):
+                    continue
             text = "\n".join(p for p in paras if len(p) > 35)
             if not text:
                 text = node.get_text(" ", strip=True)

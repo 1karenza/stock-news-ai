@@ -188,3 +188,11 @@ button:disabled { opacity: .55; transform: none !important; }
   .stButton button:hover, .stDownloadButton button:hover, [data-testid="stFormSubmitButton"] button:hover,
   [data-testid="stLinkButton"] a:hover, [data-testid="stMetric"]:hover { transform: none; }
 }
+
+/* Investor tools retain the editorial palette and native keyboard navigation. */
+[role="tablist"] { gap: 4px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
+[role="tab"] { flex: 0 0 auto; padding: 0 14px; }
+[role="tab"] p { font-size: 14px; white-space: nowrap; }
+[data-testid="stDataFrame"] { animation: none !important; }
+[data-testid="stFileUploader"] { border-radius: 14px; }
+@media(max-width:600px) { [role="tab"] {padding:0 10px;} [role="tab"] p {font-size:12px;} }

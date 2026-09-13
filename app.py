@@ -13,6 +13,11 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from news_content import summary_sentences, news_table
 from news_fetch import ArticleUnavailable, read_source_article
+from investor_profile import (get_profile, persist_profile, watchlist_selector, workspace_view,
+                              article_controls, article_id, mark_seen, changed)
+from event_views import render_event_radar, render_event_calendar
+from price_view import render_price_timeline
+from bond_scenario_view import render_bond_scenarios
 
 load_dotenv()
 
@@ -131,7 +136,7 @@ def fetch_google_news(ticker: str, days: int = 7, max_items: int = 20):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def cached_article_text(url: str, title: str = "") -> str:
+def cached_article_text(url: str, title: str = "", content_version="investor-v1") -> str:
     # Exceptions are not cached: a failed request must be retried next time.
     return read_source_article(url, title)
 
@@ -488,7 +493,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-tab_news, tab_bond = st.tabs(["01  /  Stock News", "02  /  Bond Valuation"])
+profile = get_profile()
+tab_news, tab_events, tab_calendar, tab_prices, tab_bond, tab_saved = st.tabs(
+    ["01 / Stock News", "02 / Sự kiện", "03 / Lịch doanh nghiệp", "04 / Giá & tin",
+     "05 / Bond Valuation", "06 / Danh sách & tin lưu"])
 
 
 # ============================================================
@@ -500,9 +508,10 @@ with tab_news:
         <div class="eyebrow">Your daily edit</div>
         <div class="sidebar-heading">Điểm tin riêng.</div>
         <p class="sidebar-note">Chọn mã bạn quan tâm.<br>Để những câu chuyện tìm đến bạn.</p>''', unsafe_allow_html=True)
+        watchlist_selector(profile)
+        st.session_state.setdefault("news_tickers", "FPT, TCB, VIC, VHM, PVS")
         ticker_text = st.text_input(
             "Mã cổ phiếu",
-            value="FPT, TCB, VIC, VHM, PVS",
             placeholder="VD: FPT, SSI, VCB",
             key="news_tickers",
         )
@@ -515,7 +524,7 @@ with tab_news:
             disabled=not use_ai,
             key="news_model",
         )
-        run = st.button("Quét và phân tích  ↗", type="primary", use_container_width=True, key="news_run")
+        run = st.button("Quét và phân tích  ↗", type="primary", width="stretch", key="news_run")
         st.markdown('<div class="sidebar-footer"><span class="eyebrow">Made for perspective</span><br>Tin từ Google News · Tóm tắt theo yêu cầu</div>', unsafe_allow_html=True)
 
     tickers = []
@@ -554,8 +563,15 @@ with tab_news:
         status.empty()
         progress.empty()
         st.session_state.merged_news = processed
+        mark_seen(processed, profile)
 
-    merged = st.session_state.merged_news
+    all_merged = st.session_state.merged_news
+    view_mode = st.selectbox("Tin muốn xem", ["Tất cả", "Mới từ lần xem trước", "Chưa đọc", "Đã lưu"], key="news_read_filter")
+    merged = [item for item in all_merged if
+              view_mode == "Tất cả" or
+              (view_mode == "Mới từ lần xem trước" and article_id(item) not in st.session_state.previous_seen) or
+              (view_mode == "Chưa đọc" and article_id(item) not in profile["read"]) or
+              (view_mode == "Đã lưu" and article_id(item) in profile["saved"])]
 
     missing_articles = [item for item in merged if not item.get("article_text")]
     if missing_articles:
@@ -570,6 +586,8 @@ with tab_news:
 
     if not tickers:
         st.warning("Nhập ít nhất một mã cổ phiếu.")
+    elif not merged and all_merged:
+        st.info("Không có bài phù hợp bộ lọc trạng thái đang chọn.")
     elif not merged:
         if run:
             st.info("Chưa tìm thấy tin trong khoảng thời gian này. Thử mở rộng khoảng tin hoặc đổi mã cổ phiếu.")
@@ -617,6 +635,7 @@ with tab_news:
             bullets, quick = fallback_detailed_summary(item, item.get("article_text", ""))
 
             with st.expander(f"{i}. [{tickers_text}] {item['title']}", expanded=(i == 1)):
+                article_controls(item, profile)
                 top1, top2, top3, top4 = st.columns([1, 1, 1, 1.25])
                 top1.write(f"**📅 Ngày:** {item['published']}")
                 top2.write(f"**🏷 Loại tin:** {news_type}")
@@ -645,9 +664,18 @@ with tab_news:
                     st.link_button("Đọc tin gốc  ↗", item["url"])
 
 
-# ============================================================
-# TAB 2: BOND VALUATION
-# ============================================================
+with tab_events:
+    render_event_radar(st.session_state.merged_news, profile)
+with tab_calendar:
+    if render_event_calendar(st.session_state.merged_news, profile):
+        changed()
+        st.rerun()
+with tab_prices:
+    render_price_timeline(st.session_state.merged_news, tickers)
+with tab_saved:
+    workspace_view(profile)
+
+# BOND VALUATION
 with tab_bond:
     st.markdown('<div class="section-heading"><h2>Giá trị qua con số.</h2><span class="eyebrow">02 / Bond studio</span></div>', unsafe_allow_html=True)
     st.caption(
@@ -709,7 +737,7 @@ with tab_bond:
         submitted = st.form_submit_button(
             "Khám phá định giá  ↗",
             type="primary",
-            use_container_width=True
+            width="stretch"
         )
 
     freq_map = {"Hàng năm": 1, "Nửa năm": 2, "Hàng quý": 4, "Hàng tháng": 12}
@@ -782,12 +810,12 @@ with tab_bond:
     st.markdown("#### Dòng tiền trái phiếu")
     cashflow_df = bond_cashflows(
         face_value, coupon_rate, years, m,
-        required_yield if calc_mode == "Tính giá lý thuyết" else (ytm or required_yield)
+        required_yield if calc_mode == "Tính giá lý thuyết" or ytm is None else ytm
     )
     st.dataframe(
         cashflow_df,
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={
             "Kỳ": st.column_config.NumberColumn("Kỳ"),
             "Thời gian (năm)": st.column_config.NumberColumn("Thời gian (năm)", format="%.2f"),
@@ -814,6 +842,11 @@ with tab_bond:
         "- **Modified Duration**: xấp xỉ % thay đổi giá khi yield thay đổi 1 điểm phần trăm."
     )
 
+    render_bond_scenarios({"code":bond_code, "face_value":face_value, "coupon_rate":coupon_rate,
+                           "years":years, "payments_per_year":m, "required_yield":required_yield,
+                           "market_price":market_price})
+
+persist_profile()
 st.markdown('<div class="page-footer"><span class="wordmark">stock news.</span><span class="eyebrow">Stay curious. Read thoughtfully.</span></div>', unsafe_allow_html=True)
 st.caption(
     "⚠️ Công cụ phục vụ học tập/phân tích. Bond Valuation đang giả định trái phiếu coupon cố định, "
