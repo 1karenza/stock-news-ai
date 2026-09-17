@@ -5,11 +5,29 @@ from streamlit.testing.v1 import AppTest
 from equity_fixture import make_bundle
 from equity_data import company_events, comparable_rows, relative_valuation, source_date, EquityUnavailable, parse_cafef_ownership, ownership_chart_rows
 from equity_report import build_report
-from equity_pdf import build_pdf, news_report_rows
+from equity_pdf import build_pdf, news_report_rows, report_calendar_rows
 from news_content import news_table
 
 
 class EquityTests(unittest.TestCase):
+    def test_pdf_calendar_matches_selected_month(self):
+        bundle=make_bundle()
+        month, rows=report_calendar_rows(bundle,'2026-05')
+        self.assertEqual(month,'2026-05')
+        self.assertEqual(len(rows),2)
+        self.assertTrue(all(r['Ngày'].startswith('2026-05') for r in rows))
+        self.assertEqual(report_calendar_rows(bundle,'2026-04')[1],[])
+        self.assertEqual(report_calendar_rows(bundle)[0],'2026-06')
+        app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py'),default_timeout=30)
+        app.session_state['profile_ready']=True
+        with patch('equity_views.load_equity',side_effect=make_bundle), patch('equity_pdf.build_pdf',return_value=b'%PDF-test') as export:
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(export.call_args.kwargs['calendar_month'],'2026-06')
+            app.selectbox(key='equity_month_FPT').select('2026-05').run()
+            self.assertFalse(app.exception)
+            self.assertEqual(export.call_args.kwargs['calendar_month'],'2026-05')
+
     def test_pdf_news_columns_and_embedded_graphics(self):
         row={'Ngày':'17/09/2026','Mã CK':'HPG','Source':'CafeF','Loại tin':'Doanh nghiệp',
              'Tóm tắt thông tin':'Nội dung tiếng Việt & số liệu. '*150,'Tiêu đề bài báo':'Tiêu đề kiểm tra',

@@ -5,7 +5,7 @@ import html
 import pandas as pd
 from investor_events import safe_url
 from equity_data import source_date, text_only, ownership_chart_rows
-from equity_pdf import news_report_rows
+from equity_pdf import news_report_rows, report_calendar_rows
 
 
 def ownership_svg(rows):
@@ -59,7 +59,8 @@ def svg_chart(frame, field, title, bars=False):
     {graph}<text x="75" y="258">{frame.date.min():%d/%m/%Y}</text><text x="745" y="258">{frame.date.max():%d/%m/%Y}</text></svg>'''
 
 
-def build_report(bundle, news_rows, searched_tickers):
+def build_report(bundle, news_rows, searched_tickers, calendar_month=None):
+    month, selected_events = report_calendar_rows(bundle, calendar_month)
     ticker=html.escape(bundle['ticker'])
     company=bundle['company']
     reports=[{"Ngày":source_date(r.get('issueDate')),"Đơn vị":r.get('source',''),
@@ -80,7 +81,7 @@ def build_report(bundle, news_rows, searched_tickers):
     <p>Tab I: tin đã quét cho {html.escape(', '.join(searched_tickers))}. Tab II–IV: mã {ticker}, khoảng giá {html.escape(bundle['period'])}.</p>
     <p>{html.escape(provenance)}</p><p>Bản chụp dữ liệu khi xuất; mở bằng trình duyệt, dùng Ctrl+P để lưu PDF. Dữ liệu thiếu được ghi rõ, không điền số 0 thay thế.</p>{errors}
     <section><h2>I / Stock News</h2>{table(news_report_rows(news_rows))}</section>
-    <section><h2>II / Lịch doanh nghiệp</h2><p>Lịch sử theo nguồn; cột Loại ngày phân biệt ngày công bố, chốt quyền và thực hiện. Không coi ngày đã qua là xác nhận hoàn tất.</p>{table(bundle['events'])}</section>
+    <section><h2>II / Lịch doanh nghiệp</h2><p>Tháng đang tra cứu: {html.escape(month)}. Cột Loại ngày phân biệt ngày công bố, chốt quyền và thực hiện. Không coi ngày đã qua là xác nhận hoàn tất.</p>{table(selected_events)}</section>
     <section><h2>III / Giá cổ phiếu</h2><p>{html.escape(price_note)}</p>
     {svg_chart(bundle['prices'],'close','Giá (VND/cổ phiếu)')}{svg_chart(bundle['prices'],'volume','Khối lượng (cổ phiếu)',True)}
     <h3>Cơ cấu sở hữu · CafeF</h3><p>Ngày cập nhật riêng cho từng cổ đông; công bố có thể khác thời điểm hoặc chồng lặp. Biểu đồ: 12 cổ đông lớn nhất, phần còn lại = 100% trừ tỷ lệ hiển thị. Chưa có tỷ lệ sở hữu nước ngoài xác minh được.</p>{ownership_svg(bundle['ownership'])}{table(bundle['ownership'])}

@@ -104,6 +104,7 @@ def render_equity_calendar(bundle):
     data_table(historical)
     st.caption("Lịch sử giới hạn trong dữ liệu công khai nguồn hiện trả về (tối đa 100 sự kiện quyền, cộng thông báo gần đây). Ngày đã qua không tự xác nhận sự kiện đã hoàn tất.")
     provenance(bundle)
+    return month
 
 
 def render_equity_valuation(bundle):

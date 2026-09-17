@@ -29,7 +29,13 @@ def news_report_rows(rows):
             for r in rows]
 
 
-def build_pdf(bundle, news_rows, searched_tickers):
+def report_calendar_rows(bundle, calendar_month=None):
+    months = sorted({r['Ngày'][:7] for r in bundle['events']}, reverse=True)
+    month = calendar_month if calendar_month is not None else (months[0] if months else '')
+    return month, [r for r in bundle['events'] if r['Ngày'][:7] == month]
+
+
+def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     if FONT not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont(FONT, str(Path(__file__).parent/'assets/fonts/DejaVuSans.ttf')))
     output = BytesIO()
@@ -91,8 +97,10 @@ def build_pdf(bundle, news_rows, searched_tickers):
     for error in bundle['errors']: story.append(p(error))
     grid(news_report_rows(news_rows),[10,6,40,27,17])
     section(f'II / Lịch doanh nghiệp - {bundle["ticker"]}')
+    month, selected_events = report_calendar_rows(bundle, calendar_month)
+    story.append(p(f'Tháng đang tra cứu: {month[5:7]}/{month[:4]}' if month else 'Chưa có tháng tra cứu.'))
     story.append(p('Lịch theo nguồn công khai. Ngày công bố không thay thế ngày thực hiện; ngày đã qua không xác nhận hoàn tất.'))
-    events=[{k:r.get(k) for k in ['Ngày','Sự kiện','Nhóm','Loại ngày']} for r in bundle['events']]
+    events=[{k:r.get(k) for k in ['Ngày','Sự kiện','Nhóm','Loại ngày']} for r in selected_events]
     grid(events,[12,48,18,22])
     section(f'III / Giá cổ phiếu - {bundle["ticker"]}')
     story.append(p(' · '.join(str(v) for v in bundle['price_meta'].values())))

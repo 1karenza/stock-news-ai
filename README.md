@@ -23,6 +23,8 @@ có biểu đồ giá và biểu đồ tròn nhúng. Font tiếng Việt đượ
 Bảng tin có 5 cột cân đối: ngày, mã, tóm tắt, tiêu đề, nguồn/loại tin;
 không xuất hai cột đọc tin gốc và tình trạng nguồn. Không còn nút tải HTML.
 Báo cáo ghi rõ phạm vi: tin đã quét cho danh sách mã, tab II–IV cho mã đang chọn.
+Riêng mục II chỉ xuất sự kiện thuộc **Tháng có sự kiện** đang chọn trong lịch;
+đổi tháng trước khi tải PDF để xuất đúng kỳ cần xem.
 
 ## Nguồn và giới hạn
 
