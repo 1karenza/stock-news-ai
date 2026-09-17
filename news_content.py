@@ -111,9 +111,10 @@ def news_table(rows):
                        if row.get("Tình trạng nguồn") == "Chưa tải được bài gốc" else '')
         cells.append(f'<tr><td data-label="Ngày / Mã"><strong>{esc("Mã CK")}</strong><br>{esc("Ngày")}</td>'
                      f'<td data-label="Tóm tắt thông tin" class="news-summary">{esc("Tóm tắt thông tin")}</td>'
+                     f'<td data-label="Tiêu đề bài báo">{html.escape(str(row.get("Tiêu đề bài báo", "")))}</td>'
                      f'<td data-label="Nguồn / Loại tin">{esc("Source")}<br><span class="small-muted">{esc("Loại tin")}</span><br>{link}{source_note}</td></tr>')
     return ('<div class="news-table-wrap"><table class="news-table"><caption>Bảng tổng hợp tin chứng khoán</caption>'
-            '<colgroup><col style="width:12%"><col style="width:68%"><col style="width:20%"></colgroup>'
+            '<colgroup><col style="width:10%"><col style="width:43%"><col style="width:29%"><col style="width:18%"></colgroup>'
             '<thead><tr><th scope="col">Ngày / Mã</th><th scope="col">Tóm tắt thông tin</th>'
-            '<th scope="col">Nguồn / Loại tin</th></tr></thead>'
+            '<th scope="col">Tiêu đề bài báo</th><th scope="col">Nguồn / Loại tin</th></tr></thead>'
             '<tbody>' + ''.join(cells) + '</tbody></table></div>')

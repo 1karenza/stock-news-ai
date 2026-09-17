@@ -15,9 +15,9 @@ from news_content import summary_sentences, news_table
 from news_fetch import ArticleUnavailable, read_source_article
 from investor_profile import (get_profile, persist_profile, watchlist_selector, workspace_view,
                               article_controls, article_id, mark_seen, changed)
-from event_views import render_event_calendar
-from price_view import render_price_timeline
-from bond_scenario_view import render_bond_scenarios, render_bond_comparison
+from equity_views import load_equity, render_equity_prices, render_equity_calendar, render_equity_valuation
+from equity_report import build_report
+from investor_profile import parse_tickers
 
 load_dotenv()
 
@@ -312,6 +312,7 @@ def make_table_row(item):
         "Ngày": item["date"],
         "Mã CK": ", ".join(sorted(item["tickers"])),
         "Tóm tắt thông tin": table_summary,
+        "Tiêu đề bài báo": item["title"],
         "Source": item["source"],
         "Loại tin": classify_news(body),
         "Đọc tin gốc": item["url"],
@@ -485,7 +486,7 @@ st.markdown(
       <div><div class="eyebrow">A little clarity. Every day.</div>
       <h1><span class="hero-line">Thị trường.</span><span class="hero-line">Góc nhìn riêng.</span></h1>
       <p class="hero-copy">Đọc những chuyển động mới. Hiểu câu chuyện sau con số.
-      Không gian dành cho tin chứng khoán &amp; định giá trái phiếu.</p></div>
+      Không gian dành cho tin chứng khoán &amp; định giá cổ phiếu.</p></div>
       <div class="hero-art" aria-hidden="true"><div class="orbit"></div>
       <div class="orbit second"></div><div class="hero-flower">✳</div>
       <div class="art-note">a softer look at numbers ↗</div></div>
@@ -494,9 +495,8 @@ st.markdown(
 )
 
 profile = get_profile()
-tab_news, tab_calendar, tab_prices, tab_bond, tab_saved = st.tabs(
-    ["01 / Stock News", "02 / Lịch doanh nghiệp", "03 / Giá & tin",
-     "04 / Bond Valuation", "05 / Danh sách & tin lưu"])
+tab_news, tab_calendar, tab_prices, tab_valuation = st.tabs(
+    ["I / Stock News", "II / Lịch doanh nghiệp", "III / Giá cổ phiếu", "IV / Định giá"])
 
 
 # ============================================================
@@ -508,7 +508,6 @@ with tab_news:
         <div class="eyebrow">Your daily edit</div>
         <div class="sidebar-heading">Điểm tin riêng.</div>
         <p class="sidebar-note">Chọn mã bạn quan tâm.<br>Để những câu chuyện tìm đến bạn.</p>''', unsafe_allow_html=True)
-        watchlist_selector(profile)
         st.session_state.setdefault("news_tickers", "FPT, TCB, VIC, VHM, PVS")
         ticker_text = st.text_input(
             "Mã cổ phiếu",
@@ -527,11 +526,16 @@ with tab_news:
         run = st.button("Quét và phân tích  ↗", type="primary", width="stretch", key="news_run")
         st.markdown('<div class="sidebar-footer"><span class="eyebrow">Made for perspective</span><br>Tin từ Google News · Tóm tắt theo yêu cầu</div>', unsafe_allow_html=True)
 
-    tickers = []
-    for part in ticker_text.split(","):
-        t = part.strip().upper()
-        if t and t not in tickers:
-            tickers.append(t)
+    tickers = parse_tickers(ticker_text)
+    with st.sidebar:
+        if st.session_state.get("equity_ticker") not in tickers:
+            st.session_state.pop("equity_ticker", None)
+        selected_ticker = st.selectbox("Mã đang phân tích (II–IV)", tickers, key="equity_ticker", disabled=not tickers)
+        price_period = st.selectbox("Khoảng biểu đồ giá", ["1mo","3mo","6mo","1y"], index=1,
+                                   format_func={"1mo":"1 tháng","3mo":"3 tháng","6mo":"6 tháng","1y":"1 năm"}.get)
+        st.caption("Lịch, giá, cơ cấu cổ đông và định giá tự cập nhật theo mã này. Tin tức dùng nút Quét và phân tích.")
+        if st.button("Làm mới dữ liệu doanh nghiệp"):
+            load_equity.clear()
 
     if "merged_news" not in st.session_state:
         st.session_state.merged_news = []
@@ -565,7 +569,7 @@ with tab_news:
         st.session_state.merged_news = processed
         mark_seen(processed, profile)
 
-    all_merged = st.session_state.merged_news
+    all_merged = [item for item in st.session_state.merged_news if set(item.get("tickers", [])) & set(tickers)]
     view_mode = st.selectbox("Tin muốn xem", ["Tất cả", "Mới từ lần xem trước", "Chưa đọc", "Đã lưu"], key="news_read_filter")
     merged = [item for item in all_merged if
               view_mode == "Tất cả" or
@@ -602,13 +606,13 @@ with tab_news:
         <div class="workflow-grid">
         <article class="workflow-card"><span class="step">01 / DISCOVER</span><h4>Chọn điều quan tâm.</h4><p>Theo dõi nhiều mã cùng lúc, với khoảng tin phù hợp nhịp đọc của bạn.</p></article>
         <article class="workflow-card"><span class="step">02 / UNDERSTAND</span><h4>Đọc sâu hơn một chút.</h4><p>Tóm tắt, phân loại và góc nhìn sơ bộ. Luôn có đường dẫn về bài gốc.</p></article>
-        <article class="workflow-card"><span class="step">03 / EXPLORE</span><h4>Hiểu từng con số.</h4><p>Khám phá giá, lợi suất và dòng tiền trong tab Bond Valuation.</p></article>
+        <article class="workflow-card"><span class="step">03 / EXPLORE</span><h4>Hiểu từng con số.</h4><p>Khám phá giá cổ phiếu, lịch doanh nghiệp và so sánh định giá cùng ngành.</p></article>
         </div>''', unsafe_allow_html=True)
     else:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Tin đã quét", len(merged))
         c2.metric("Mã theo dõi", len(tickers))
-        c3.metric("Tin trái phiếu", sum(1 for x in merged if x.get("bond_info", "-") != "-"))
+        c3.metric("Tin chưa đọc", sum(1 for x in merged if article_id(x) not in profile["read"]))
         c4.metric("Nguồn báo", len(set(x["source"] for x in merged)))
 
         st.markdown("### Những chuyển động mới")
@@ -664,209 +668,31 @@ with tab_news:
                     st.link_button("Đọc tin gốc  ↗", item["url"])
 
 
-with tab_calendar:
-    if render_event_calendar(st.session_state.merged_news, profile):
-        changed()
-        st.rerun()
-with tab_prices:
-    render_price_timeline(st.session_state.merged_news, tickers)
-with tab_saved:
-    workspace_view(profile)
-
-# BOND VALUATION
-def render_single_bond():
-    st.caption("Nhập thông số → bấm tính → đọc kết quả. Các số liệu mẫu chỉ để thử công cụ.")
-
-    preset_name = st.selectbox(
-        "Chọn mẫu để bắt đầu",
-        list(BOND_PRESETS.keys()),
-        index=1,
-        key="bond_preset",
-    )
-    preset = BOND_PRESETS[preset_name]
-
-    d_code = preset["code"] if preset else "TCB-BOND-01"
-    d_face = preset["face"] if preset else 100000
-    d_coupon = preset["coupon"] if preset else 8.0
-    d_years = preset["years"] if preset else 5.0
-    d_freq = preset["freq"] if preset else 2
-    d_market = preset["market_price"] if preset else 96500
-    d_yield = preset["required_yield"] if preset else 9.0
-
-    with st.form("bond_form"):
-        st.markdown("#### 1. Thông tin trái phiếu")
-        r1c1, r1c2 = st.columns(2)
-        bond_code = r1c1.text_input("Mã / tên trái phiếu", value=d_code)
-        face_value = r1c2.number_input(
-            "Mệnh giá", min_value=1.0, value=float(d_face), step=1000.0
-        )
-        r2c1, r2c2 = st.columns(2)
-        coupon_pct = r2c1.number_input(
-            "Lãi coupon (%/năm)", min_value=0.0, value=float(d_coupon), step=0.1,
-            help="Lãi trả hàng năm tính trên mệnh giá. Nhập 8 nghĩa là 8%/năm."
-        )
-        years = r2c2.number_input(
-            "Số năm còn lại", min_value=0.01, max_value=100.0, value=float(d_years), step=0.5,
-            help="Mô hình cần số kỳ trả lãi nguyên. Ví dụ trả lãi 2 lần/năm: 0,5; 1; 1,5 năm…"
-        )
-        freq_label = st.selectbox(
-            "Trả lãi bao lâu một lần?",
-            ["Hàng năm", "Nửa năm", "Hàng quý", "Hàng tháng"],
-            index={1:0, 2:1, 4:2, 12:3}.get(d_freq, 1)
-        )
-        st.markdown("#### 2. Giá & lợi suất")
-        r3c1, r3c2 = st.columns(2)
-        market_price = r3c1.number_input(
-            "Giá mua / giá thị trường", min_value=0.01, value=float(d_market), step=500.0,
-            help="Dùng cùng đơn vị với mệnh giá. Mệnh giá 100.000 thì giá mua có thể là 96.500."
-        )
-        required_yield_pct = r3c2.number_input(
-            "Lợi suất kỳ vọng (%/năm)",
-            min_value=0.0, value=float(d_yield), step=0.1,
-            help="Mức lợi suất dùng để chiết khấu dòng tiền và tính giá lý thuyết."
-        )
-        calc_mode = "Tính giá lý thuyết"
-
-        submitted = st.form_submit_button(
-            "Tính kết quả",
-            type="primary",
-            width="stretch"
-        )
-
-    freq_map = {"Hàng năm": 1, "Nửa năm": 2, "Hàng quý": 4, "Hàng tháng": 12}
-    m = freq_map[freq_label]
-
-    coupon_rate = coupon_pct / 100
-    required_yield = required_yield_pct / 100
-
-    current_bond = {"code":bond_code, "face_value":face_value, "coupon_rate":coupon_rate,
-                    "years":years, "payments_per_year":m, "required_yield":required_yield,
-                    "market_price":market_price}
-    from bond_scenarios import validate_bond
-    try:
-        validate_bond(current_bond)
-    except ValueError as exc:
-        st.warning(str(exc))
-        return None
-    if not submitted and "single_bond_result" not in st.session_state:
-        st.info("Bấm Tính kết quả để xem giá lý thuyết và lợi suất từ giá mua.")
-        return current_bond
-    if submitted:
-        st.session_state.single_bond_result = current_bond.copy()
-    if st.session_state.single_bond_result != current_bond:
-        st.info("Thông số đã thay đổi. Bấm Tính kết quả để cập nhật.")
-        return current_bond
-
-    # Always show results after any render; form values are current.
-    fair_price = bond_price(face_value, coupon_rate, years, m, required_yield)
-    ytm = solve_ytm(face_value, coupon_rate, years, m, market_price)
-    mac_dur = macaulay_duration(face_value, coupon_rate, years, m, required_yield)
-    mod_dur = modified_duration(face_value, coupon_rate, years, m, required_yield)
-
-    if calc_mode == "Tính giá lý thuyết":
-        main_value = fair_price
-        difference = market_price - fair_price
-        status = (
-            "Giá thị trường cao hơn giá lý thuyết"
-            if difference > 0 else
-            "Giá thị trường thấp hơn giá lý thuyết"
-            if difference < 0 else
-            "Giá thị trường xấp xỉ giá lý thuyết"
-        )
-    else:
-        main_value = ytm if ytm is not None else float("nan")
-        difference = (ytm - coupon_rate) if ytm is not None else None
-        status = (
-            "YTM > Coupon → trái phiếu thường giao dịch Discount"
-            if ytm is not None and ytm > coupon_rate else
-            "YTM < Coupon → trái phiếu thường giao dịch Premium"
-            if ytm is not None and ytm < coupon_rate else
-            "YTM xấp xỉ Coupon → gần Par"
-            if ytm is not None else
-            "Không giải được YTM với bộ dữ liệu hiện tại"
-        )
-
-    st.markdown("### Kết quả của bạn")
-    k1, k2, k3 = st.columns(3)
-
-    if calc_mode == "Tính giá lý thuyết":
-        k1.metric("Giá lý thuyết", fmt_money(fair_price))
-    else:
-        k1.metric("YTM", fmt_pct(ytm) if ytm is not None else "N/A")
-
-    k2.metric("Lợi suất từ giá mua (YTM)", fmt_pct(ytm) if ytm is not None else "N/A")
-    kind = classify_bond(market_price, face_value)
-    k3.metric("Giá mua so với mệnh giá", {"Premium":"Cao hơn", "Discount":"Thấp hơn", "Par":"Ngang giá"}.get(kind, kind))
-
-    st.info(f"**{bond_code}:** {status}")
-
-    if calc_mode == "Tính giá lý thuyết":
-        diff_pct = (market_price / fair_price - 1) * 100 if fair_price else 0
-        st.write(
-            f"Chênh lệch giá thị trường so với giá lý thuyết: "
-            f"**{fmt_money(difference)}** ({diff_pct:+.2f}%)."
-        )
-    else:
-        if ytm is not None:
-            st.write(
-                f"YTM ước tính là **{fmt_pct(ytm)}**, so với coupon "
-                f"**{coupon_pct:.2f}%/năm**."
-            )
-
-    details = st.expander("Xem dòng tiền, duration & tải CSV")
-    q1, q2 = details.columns(2)
-    q1.metric("Macaulay Duration", f"{mac_dur:.2f} năm" if mac_dur is not None else "N/A")
-    q2.metric("Modified Duration", f"{mod_dur:.2f}" if mod_dur is not None else "N/A")
-    cashflow_df = bond_cashflows(
-        face_value, coupon_rate, years, m,
-        required_yield if calc_mode == "Tính giá lý thuyết" or ytm is None else ytm
-    )
-    details.dataframe(
-        cashflow_df,
-        hide_index=True,
-        width="stretch",
-        column_config={
-            "Kỳ": st.column_config.NumberColumn("Kỳ"),
-            "Thời gian (năm)": st.column_config.NumberColumn("Thời gian (năm)", format="%.2f"),
-            "Coupon": st.column_config.NumberColumn("Coupon", format="%.0f"),
-            "Gốc": st.column_config.NumberColumn("Gốc", format="%.0f"),
-            "Dòng tiền": st.column_config.NumberColumn("Dòng tiền", format="%.0f"),
-            "PV dòng tiền": st.column_config.NumberColumn("PV dòng tiền", format="%.0f"),
-        }
-    )
-
-    details.download_button(
-        "Tải bảng dòng tiền CSV  ↓",
-        data=cashflow_df.to_csv(index=False).encode("utf-8-sig"),
-        file_name=f"{bond_code}_cashflows.csv",
-        mime="text/csv",
-        key="bond_csv",
-    )
-
-    terms = st.expander("Giải thích các chỉ số")
-    terms.write(
-        "- **Giá lý thuyết**: PV của toàn bộ coupon + mệnh giá chiết khấu theo required yield.\n"
-        "- **YTM**: mức lợi suất làm PV dòng tiền bằng đúng giá thị trường.\n"
-        "- **Premium**: giá thị trường > mệnh giá; **Discount**: giá thị trường < mệnh giá.\n"
-        "- **Modified Duration**: xấp xỉ % thay đổi giá khi yield thay đổi 1 điểm phần trăm."
-    )
-
-    with st.expander("Thử khi lợi suất tăng hoặc giảm"):
-        render_bond_scenarios(current_bond)
-    return current_bond
-
-
-with tab_bond:
-    st.markdown('<div class="section-heading"><h2>Trái phiếu, dễ hiểu hơn.</h2><span class="eyebrow">Bond studio</span></div>', unsafe_allow_html=True)
-    single_tab, compare_tab = st.tabs(["Định giá một trái phiếu", "So sánh trái phiếu"])
-    with single_tab:
-        current_bond = render_single_bond()
-    with compare_tab:
-        render_bond_comparison(current_bond)
-
+if selected_ticker:
+    with st.spinner(f"Đang tải dữ liệu doanh nghiệp {selected_ticker}…"):
+        equity = load_equity(selected_ticker, price_period)
+    if equity["errors"]:
+        with st.expander("Tình trạng nguồn dữ liệu"):
+            for error in equity["errors"]:
+                st.warning(error)
+    with tab_calendar:
+        render_equity_calendar(equity)
+    with tab_prices:
+        render_equity_prices(equity)
+    with tab_valuation:
+        render_equity_valuation(equity)
+    with st.sidebar:
+        report_rows = [make_table_row(item) for item in all_merged]
+        st.download_button("Xuất report 4 tabs · HTML",
+                           build_report(equity, report_rows, tickers),
+                           file_name=f"stock-news-{selected_ticker}.html",
+                           mime="text/html", width="stretch")
+        st.caption("Báo cáo gồm tin đã quét và dữ liệu II–IV của mã đang phân tích. Mở file rồi Ctrl+P để lưu PDF.")
+else:
+    with tab_prices:
+        st.info("Nhập mã cổ phiếu ở thanh bên để tự tải dữ liệu.")
 persist_profile()
 st.markdown('<div class="page-footer"><span class="wordmark">stock news.</span><span class="eyebrow">Stay curious. Read thoughtfully.</span></div>', unsafe_allow_html=True)
 st.caption(
-    "⚠️ Công cụ phục vụ học tập/phân tích. Bond Valuation đang giả định trái phiếu coupon cố định, "
-    "dòng tiền đều và không xét default risk, call/put option, thuế hay accrued interest."
+    "Dữ liệu tham khảo từ nguồn công khai có thể trễ hoặc thiếu. Đối chiếu ngày công bố và nguồn trước khi sử dụng."
 )

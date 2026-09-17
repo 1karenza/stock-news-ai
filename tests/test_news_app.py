@@ -7,6 +7,7 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from news_fetch import ArticleUnavailable
+from equity_fixture import make_bundle
 
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -43,7 +44,7 @@ class NewsAppTests(unittest.TestCase):
         app = AppTest.from_file(str(APP_PATH), default_timeout=30)
         app.session_state["merged_news"] = [item]
 
-        with patch("news_fetch.read_source_article", side_effect=[ArticleUnavailable("offline"), ARTICLE]) as read:
+        with patch("equity_views.load_equity", side_effect=make_bundle), patch("news_fetch.read_source_article", side_effect=[ArticleUnavailable("offline"), ARTICLE]) as read:
             app.run()
             self.assertEqual(len(app.exception), 0)
             read.assert_not_called()

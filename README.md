@@ -1,115 +1,73 @@
 # Stock News AI — Investor Workspace
 
-Ứng dụng: https://stock-news-kngan.streamlit.app · Repo: `1karenza/stock-news-ai`.
+Ứng dụng: https://stock-news-kngan.streamlit.app · GitHub: `1karenza/stock-news-ai`.
 
-## Công cụ dành cho nhà đầu tư
+## Bốn tab
 
-1. **Danh sách & tin lưu**: tạo/cập nhật tối đa 20 nhóm cổ phiếu, áp dụng nhóm từ
-   thanh bên; đánh dấu đã đọc/chưa đọc, lưu tối đa 100 bài, lọc tin mới từ lần xem
-   trước. Hồ sơ và 60 tin gần nhất lưu trong localStorage của trình duyệt, không
-   dùng file hồ sơ chung trên server. JSON sao lưu dùng để chuyển thiết bị.
-2. **Lịch doanh nghiệp**: lịch tháng tách ngày chốt quyền, ngày thanh toán, họp
-   cổ đông và các mốc khác. Chỉ đưa ngày đầy đủ có bằng chứng vào lịch; mốc thiếu
-   năm cần kiểm tra. Có thêm/sửa/xóa mốc của bạn, xuất CSV và ICS. File ICS nhập
-   một lần vào ứng dụng lịch, không tự đồng bộ hay tự nhắc qua email.
-3. **Giá & tin**: tải lịch sử giá ngày qua Yahoo Finance với mã `<TICKER>.VN`,
-   biểu đồ giá/khối lượng và mốc tin. Nguồn có thể trễ, thiếu mã hoặc tạm ngừng;
-   có CSV thay thế (date,close,volume; YYYY-MM-DD; VND; số không có dấu hàng nghìn).
-   Hiển thị thời điểm tải, phiên cuối, nguồn và trạng thái điều chỉnh. Không dùng
-   dữ liệu này để đặt lệnh; tin cùng ngày không chứng minh nguyên nhân biến động.
-4. **Bond Valuation**: hai mục Định giá một trái phiếu và So sánh trái phiếu.
-   Nhập theo nhóm với giải thích tại ô; kết quả giá/YTM lên trước, dòng tiền và
-   duration mở khi cần. So sánh nhập bằng từng thẻ, có kết luận tự động. Tính lại giá theo ±0,5/±1 điểm phần
-   trăm và kịch bản riêng; so sánh 2–3 trái phiếu, chuẩn hóa theo % biến động và
-   100 mệnh giá, xuất CSV. Dùng kỳ coupon đều, không mô phỏng rủi ro vỡ nợ.
+1. **I / Stock News**: quét tin theo danh sách mã, đọc tóm tắt và tiêu đề bài báo,
+   mở nguồn, lưu tin và đánh dấu đã đọc.
+2. **II / Lịch doanh nghiệp**: tự tải các mốc của mã cổ phiếu đang phân tích,
+   gồm lịch sử cổ tức, quyền cổ đông, đại hội và thông báo doanh nghiệp.
+   Ngày giao dịch không hưởng quyền, đăng ký cuối cùng, thực hiện và công bố
+   được phân biệt; mặc định mở tháng gần nhất có dữ liệu.
+3. **III / Giá cổ phiếu**: tự tải biểu đồ giá và khối lượng, cơ cấu cổ đông,
+   lịch sử cổ tức, phát hành thêm và thưởng cổ phiếu. Không ghép tin vào biểu đồ.
+4. **IV / Định giá**: P/E, P/B, vốn hóa từ nguồn công khai; đối chiếu tối đa
+   5 mã có cùng mã nhóm ngành, tham chiếu tương đối và báo cáo giá mục tiêu.
 
-Menu chính gồm Stock News, Lịch doanh nghiệp, Giá & tin, Bond Valuation và
-Danh sách & tin lưu. Tab Sự kiện riêng đã được bỏ để giảm trùng lặp; logic
-nhận diện/gom sự kiện vẫn phục vụ lịch doanh nghiệp.
+Nhập mã ở thanh trái; chọn **Mã đang phân tích (II–IV)** và khoảng biểu đồ.
+Các tab II–IV tự tải, không cần bấm quét. Tin ở tab I dùng **Quét và phân tích**.
+Nút **Xuất report 4 tabs · HTML** ở thanh trái tải báo cáo cùng dữ liệu hiện tại,
+có biểu đồ nhúng và các bảng. Mở file bằng trình duyệt; Ctrl+P để lưu PDF.
+Báo cáo ghi rõ phạm vi: tin đã quét cho danh sách mã, tab II–IV cho mã đang chọn.
 
-LocalStorage bị xóa hoặc dùng trình duyệt khác sẽ không còn hồ sơ cũ nếu chưa
-khôi phục JSON. Trình duyệt chặn lưu vẫn dùng được phiên hiện tại và xuất JSON.
-Ngày lịch từ báo chí là dữ liệu cần đối chiếu; tên miền chính thức không đồng
-nghĩa sự kiện đã được xác minh độc lập. Không có tự quét theo giờ trong bản này.
+## Nguồn và giới hạn
 
-## Kiểm tra
+- Google News RSS và bài gốc cho tin tức; nếu bài gốc không đọc được, app chỉ
+  sử dụng nội dung nguồn có sẵn, không tự tạo chi tiết.
+- CafeF cho danh sách cổ đông, số cổ phiếu, tỷ lệ và ngày cập nhật từng công bố.
+  Biểu đồ hiện 12 cổ đông lớn nhất và phần còn lại; không vẽ khi tổng vượt 100%.
+  Chưa có tỷ lệ sở hữu nước ngoài xác minh được; không suy ra từ room ngoại.
+- Simplize cho hồ sơ, quyền cổ đông, chỉ số và báo cáo phân tích.
+  Lịch sử giới hạn ở bản ghi nguồn trả về, tối đa 100 sự kiện quyền và các
+  thông báo gần đây. Ngày công bố không thay thế ngày thực hiện; ngày đã qua
+  không tự chứng minh sự kiện hoàn tất.
+- Yahoo Finance (`<TICKER>.VN`) cho giá đóng cửa và khối lượng ngày, đơn vị VND.
+  Chưa xác minh điều chỉnh chia tách; phiên đang giao dịch có thể chưa hoàn tất.
+- Dữ liệu doanh nghiệp được cache 5 phút. Nút **Làm mới dữ liệu doanh nghiệp**
+  cho phép thử tải lại. Nguồn lỗi hoặc thiếu được ghi rõ, không thay bằng số giả.
+- P/E dùng TTM, P/B dùng quý gần nhất. Tham chiếu tương đối do app tính bằng
+  EPS/BVPS nhân trung vị bội số của ít nhất hai mã hợp lệ, loại mã đang tra.
+  Giá mục tiêu của tổ chức phân tích được trình bày riêng kèm ngày và nguồn.
+  Dữ liệu không phải báo giá trực tiếp hay khuyến nghị đầu tư.
 
-Yêu cầu Streamlit >=1.63. Chạy `python -m pip install -r requirements.txt`, rồi:
+## Chạy và kiểm tra
 
 ```powershell
+python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 python -m streamlit run app.py
 ```
 
-Các module mới: `investor_profile.py`, `investor_events.py`, `event_views.py`,
-`market_prices.py`, `price_view.py`, `bond_scenarios.py`, `bond_scenario_view.py`.
-Khi deploy phải commit đủ các module này và `requirements.txt` cùng `app.py`.
+Cũng có thể mở `START_HERE_WINDOWS.bat`.
+Các module cho bốn tab: `equity_data.py`, `equity_views.py`, `equity_report.py`,
+cùng các module tin tức, hồ sơ và giá đã có. Cần commit đủ các file phụ thuộc.
 
-## Tab 1 — Stock News
-- Quét tin theo mã cổ phiếu.
-- Đọc/tóm tắt nội dung bài gốc khi có thể.
-- Giữ nút Đọc tin gốc.
-- Trích thông tin trái phiếu nếu bài có đề cập.
+## GitHub và triển khai
 
-## Tab 2 — Bond Valuation
-- Nhập mã/tên trái phiếu.
-- Mệnh giá.
-- Coupon rate.
-- Thời gian còn lại.
-- Tần suất trả coupon.
-- Giá thị trường.
-- Required yield.
-
-App tính:
-- Giá lý thuyết.
-- YTM.
-- Premium / Par / Discount.
-- Macaulay Duration.
-- Modified Duration.
-- Bảng cash flow và PV từng kỳ.
-- Xuất CSV.
-
-Có 3 bộ dữ liệu mẫu để test ngay.
-
-## Chạy
-Double-click START_HERE_WINDOWS.bat
-
-## GitHub và deployment
-
-Folder local được liên kết với https://github.com/1karenza/stock-news-ai,
-nhánh `main`. Streamlit Cloud dùng file `app.py` tại root repo.
-Production: https://stock-news-kngan.streamlit.app
-
-Sau khi sửa code, chạy thử bằng `streamlit run app.py` hoặc
-`START_HERE_WINDOWS.bat`. Mở terminal tại folder này rồi chạy:
+Repo `1karenza/stock-news-ai`, nhánh `main`, entry `app.py` tại root.
+Streamlit Cloud tự redeploy sau khi push lên main. Lưu file local không tự push.
 
 ```powershell
 git status
 git diff
-git add app.py news_content.py news_fetch.py assets requirements.txt README.md .gitignore .streamlit/config.toml
+git add <cac-file-da-sua>
 git diff --cached
 git commit -m "Update dashboard"
 git push origin main
 ```
 
-Nếu thêm file mới, dùng `git add <file>` để đưa file đó vào commit.
-Git có thể yêu cầu đăng nhập GitHub trong lần push đầu tiên.
-Nếu Git yêu cầu danh tính commit, cấu hình `git config user.name "Tên của bạn"`
-và `git config user.email "Email GitHub của bạn"` rồi commit lại.
-
-Streamlit Cloud tự redeploy sau khi push. Kiểm tra production URL sau đó;
-nếu chưa cập nhật, dùng menu quản lý app để Reboot app.
-Việc lưu file local không tự commit hoặc push.
-
-Nếu GitHub có commit mới, dùng `git pull --rebase origin main` sau khi đã
-commit thay đổi local, giải quyết conflict nếu có, rồi push lại. Không force push.
-
 Không commit `.venv`, `.env`, API keys hoặc `.streamlit/secrets.toml`.
-API key production được cấu hình trong Streamlit App Settings / Secrets.
-
-## Giao diện editorial
-
-Style chung nằm trong `assets/editorial.css`; phải commit cả folder `assets`
-khi deploy. Theme native của Streamlit nằm trong `.streamlit/config.toml`.
-League Spartan tải từ Google Fonts, với sans-serif dự phòng khi mất kết nối.
-Giao diện hỗ trợ màn hình nhỏ, focus bàn phím và `prefers-reduced-motion`.
+App chạy không cần OpenAI key; nếu bật AI, thêm key trong Streamlit Secrets.
+Theme nằm ở `.streamlit/config.toml`, style ở `assets/editorial.css`.
+League Spartan có font dự phòng; giao diện hỗ trợ bàn phím và reduced motion.
