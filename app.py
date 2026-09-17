@@ -529,7 +529,7 @@ with tab_news:
     tickers = parse_tickers(ticker_text)
     with st.sidebar:
         if st.session_state.get("equity_ticker") not in tickers:
-            st.session_state.pop("equity_ticker", None)
+            st.session_state["equity_ticker"] = tickers[0] if tickers else None
         selected_ticker = st.selectbox("Mã đang phân tích (II–IV)", tickers, key="equity_ticker", disabled=not tickers)
         price_period = st.selectbox("Khoảng biểu đồ giá", ["1mo","3mo","6mo","1y"], index=1,
                                    format_func={"1mo":"1 tháng","3mo":"3 tháng","6mo":"6 tháng","1y":"1 năm"}.get)
