@@ -80,11 +80,6 @@ def render_equity_prices(bundle):
         st.info("Các công bố có thể khác ngày hoặc chồng lặp; tổng tỷ lệ vượt 100% nên chỉ hiển thị bảng gốc.")
     data_table(ownership)
     st.caption("Nguồn CafeF · ngày cập nhật của từng cổ đông nằm trong bảng. Biểu đồ hiển thị 12 cổ đông lớn nhất; phần còn lại = 100% trừ các tỷ lệ hiển thị. Các công bố có thể khác ngày, không phải ảnh chụp sở hữu cùng thời điểm. Chưa có tỷ lệ sở hữu nước ngoài xác minh được từ nguồn này; room ngoại không được dùng thay thế.")
-    st.markdown("### Lịch sử chia cổ tức")
-    data_table([e for e in bundle["events"] if e["Nhóm"]=="Cổ tức" and e["Ngày"]<=date.today().isoformat()])
-    st.markdown("### Phát hành thêm & thưởng cổ phiếu")
-    data_table([e for e in bundle["events"] if e["Nhóm"]=="Phát hành / thưởng cổ phiếu"])
-    st.caption("Ngày công bố thông báo phát hành không có nghĩa đợt phát hành đã hoàn tất. Lịch sử chỉ gồm các bản ghi nguồn trả về.")
     provenance(bundle)
 
 
@@ -123,7 +118,7 @@ def render_equity_valuation(bundle):
     for box,key in [(a,"P/E (TTM)"),(b,"P/B (FQ)"),(c,"Vốn hóa (tỷ đồng)")]:
         box.metric(key, f'{target[key]:,.2f}' if target[key] is not None else "Chưa có")
     st.markdown("#### So sánh doanh nghiệp cùng ngành")
-    st.caption("Tối đa 5 mã gợi ý từ nguồn, chỉ giữ doanh nghiệp có cùng mã nhóm ngành đã đối chiếu. Đây là mẫu so sánh, không phải toàn ngành.")
+    st.caption("Tối đa 10 mã đối chiếu ngoài mã đang tra, ưu tiên vốn hóa lớn trong danh sách ngành nguồn trả về; xác minh cùng mã nhóm ngành và xếp theo vốn hóa. Ngành ít mã có thể không đủ 10; đây không phải xếp hạng chất lượng đầu tư.")
     data_table(peers)
     chart_rows = [{"Mã":r["Mã"],"Chỉ số":k,"Giá trị":r[k]} for r in peers for k in ("P/E (TTM)","P/B (FQ)") if r[k] is not None and r[k]>0]
     if chart_rows:

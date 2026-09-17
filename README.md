@@ -10,15 +10,18 @@
    gồm lịch sử cổ tức, quyền cổ đông, đại hội và thông báo doanh nghiệp.
    Ngày giao dịch không hưởng quyền, đăng ký cuối cùng, thực hiện và công bố
    được phân biệt; mặc định mở tháng gần nhất có dữ liệu.
-3. **III / Giá cổ phiếu**: tự tải biểu đồ giá và khối lượng, cơ cấu cổ đông,
-   lịch sử cổ tức, phát hành thêm và thưởng cổ phiếu. Không ghép tin vào biểu đồ.
+3. **III / Giá cổ phiếu**: tự tải biểu đồ giá, khối lượng và cơ cấu sở hữu CafeF.
+   Lịch cổ tức và phát hành được xem tại mục II, không lặp lại bên dưới mục III.
 4. **IV / Định giá**: P/E, P/B, vốn hóa từ nguồn công khai; đối chiếu tối đa
-   5 mã có cùng mã nhóm ngành, tham chiếu tương đối và báo cáo giá mục tiêu.
+   10 mã đối chiếu cùng mã nhóm ngành ngoài mã đang tra, ưu tiên vốn hóa lớn
+   trong danh sách ngành nguồn trả về; tham chiếu tương đối và báo cáo giá mục tiêu.
 
 Nhập mã ở thanh trái; chọn **Mã đang phân tích (II–IV)** và khoảng biểu đồ.
 Các tab II–IV tự tải, không cần bấm quét. Tin ở tab I dùng **Quét và phân tích**.
-Nút **Xuất report 4 tabs · HTML** ở thanh trái tải báo cáo cùng dữ liệu hiện tại,
-có biểu đồ nhúng và các bảng. Mở file bằng trình duyệt; Ctrl+P để lưu PDF.
+Nút **Xuất report 4 tabs · PDF** ở thanh trái tải PDF trực tiếp, khổ A4 ngang,
+có biểu đồ giá và biểu đồ tròn nhúng. Font tiếng Việt được đóng gói cùng app.
+Bảng tin có 5 cột cân đối: ngày, mã, tóm tắt, tiêu đề, nguồn/loại tin;
+không xuất hai cột đọc tin gốc và tình trạng nguồn. Không còn nút tải HTML.
 Báo cáo ghi rõ phạm vi: tin đã quét cho danh sách mã, tab II–IV cho mã đang chọn.
 
 ## Nguồn và giới hạn
@@ -50,7 +53,7 @@ python -m streamlit run app.py
 ```
 
 Cũng có thể mở `START_HERE_WINDOWS.bat`.
-Các module cho bốn tab: `equity_data.py`, `equity_views.py`, `equity_report.py`,
+Các module cho bốn tab: `equity_data.py`, `equity_views.py`, `equity_pdf.py`,
 cùng các module tin tức, hồ sơ và giá đã có. Cần commit đủ các file phụ thuộc.
 
 ## GitHub và triển khai

@@ -8,3 +8,4 @@ openai>=1.0
 requests>=2.32
 numpy>=2.0
 googlenewsdecoder>=0.1.7,<1
+reportlab>=4.4,<5

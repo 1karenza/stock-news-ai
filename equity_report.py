@@ -5,6 +5,7 @@ import html
 import pandas as pd
 from investor_events import safe_url
 from equity_data import source_date, text_only, ownership_chart_rows
+from equity_pdf import news_report_rows
 
 
 def ownership_svg(rows):
@@ -66,8 +67,6 @@ def build_report(bundle, news_rows, searched_tickers):
               "Nguồn":safe_url(r.get('attachedLink'))} for r in company.get('analysisReports',[])]
     provenance=(f'Simplize · cập nhật trang: {company["summary"].get("analysisUpdated","chưa rõ")} · tải {company["fetched"]}' if company else 'Chưa có hồ sơ doanh nghiệp')
     price_note=' · '.join(str(v) for v in bundle['price_meta'].values())
-    dividends=[e for e in bundle['events'] if e['Nhóm']=='Cổ tức' and e['Ngày']<=date.today().isoformat()]
-    issues=[e for e in bundle['events'] if e['Nhóm']=='Phát hành / thưởng cổ phiếu']
     errors=''.join('<p>'+html.escape(e)+'</p>' for e in bundle['errors'])
     now=datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).strftime('%d/%m/%Y %H:%M (UTC+7)')
     return f'''<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -80,12 +79,11 @@ def build_report(bundle, news_rows, searched_tickers):
     </style><h1>Stock News · Báo cáo {ticker}</h1><p>Xuất lúc {now}</p>
     <p>Tab I: tin đã quét cho {html.escape(', '.join(searched_tickers))}. Tab II–IV: mã {ticker}, khoảng giá {html.escape(bundle['period'])}.</p>
     <p>{html.escape(provenance)}</p><p>Bản chụp dữ liệu khi xuất; mở bằng trình duyệt, dùng Ctrl+P để lưu PDF. Dữ liệu thiếu được ghi rõ, không điền số 0 thay thế.</p>{errors}
-    <section><h2>I / Stock News</h2>{table(news_rows)}</section>
+    <section><h2>I / Stock News</h2>{table(news_report_rows(news_rows))}</section>
     <section><h2>II / Lịch doanh nghiệp</h2><p>Lịch sử theo nguồn; cột Loại ngày phân biệt ngày công bố, chốt quyền và thực hiện. Không coi ngày đã qua là xác nhận hoàn tất.</p>{table(bundle['events'])}</section>
     <section><h2>III / Giá cổ phiếu</h2><p>{html.escape(price_note)}</p>
     {svg_chart(bundle['prices'],'close','Giá (VND/cổ phiếu)')}{svg_chart(bundle['prices'],'volume','Khối lượng (cổ phiếu)',True)}
     <h3>Cơ cấu sở hữu · CafeF</h3><p>Ngày cập nhật riêng cho từng cổ đông; công bố có thể khác thời điểm hoặc chồng lặp. Biểu đồ: 12 cổ đông lớn nhất, phần còn lại = 100% trừ tỷ lệ hiển thị. Chưa có tỷ lệ sở hữu nước ngoài xác minh được.</p>{ownership_svg(bundle['ownership'])}{table(bundle['ownership'])}
-    <h3>Lịch sử cổ tức</h3>{table(dividends)}<h3>Phát hành thêm / thưởng cổ phiếu</h3>{table(issues)}
     <h3>Dữ liệu giá</h3>{table(bundle['prices'].assign(date=bundle['prices'].date.dt.strftime('%Y-%m-%d')).to_dict('records') if not bundle['prices'].empty else [])}</section>
     <section><h2>IV / Định giá</h2><p>P/E: TTM · P/B: quý gần nhất. Mẫu cùng nhóm ngành, không phải toàn ngành.</p>{table(bundle['peers'])}
     <h3>Tham chiếu tương đối</h3><p>EPS × trung vị P/E hoặc BVPS × trung vị P/B; loại mã đang tra và bội số không dương, cần ít nhất 2 mã. Đây là phép tính của app, không phải giá mục tiêu từ báo cáo.</p>{table(bundle['relative'])}

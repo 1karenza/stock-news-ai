@@ -16,7 +16,7 @@ from news_fetch import ArticleUnavailable, read_source_article
 from investor_profile import (get_profile, persist_profile, watchlist_selector, workspace_view,
                               article_controls, article_id, mark_seen, changed)
 from equity_views import load_equity, render_equity_prices, render_equity_calendar, render_equity_valuation
-from equity_report import build_report
+from equity_pdf import build_pdf
 from investor_profile import parse_tickers
 
 load_dotenv()
@@ -683,11 +683,11 @@ if selected_ticker:
         render_equity_valuation(equity)
     with st.sidebar:
         report_rows = [make_table_row(item) for item in all_merged]
-        st.download_button("Xuất report 4 tabs · HTML",
-                           build_report(equity, report_rows, tickers),
-                           file_name=f"stock-news-{selected_ticker}.html",
-                           mime="text/html", width="stretch")
-        st.caption("Báo cáo gồm tin đã quét và dữ liệu II–IV của mã đang phân tích. Mở file rồi Ctrl+P để lưu PDF.")
+        st.download_button("Xuất report 4 tabs · PDF",
+                           build_pdf(equity, report_rows, tickers),
+                           file_name=f"stock-news-{selected_ticker}.pdf",
+                           mime="application/pdf", width="stretch")
+        st.caption("PDF khổ ngang, có biểu đồ và bảng số liệu. Gồm tin đã quét và dữ liệu II–IV của mã đang phân tích.")
 else:
     with tab_prices:
         st.info("Nhập mã cổ phiếu ở thanh bên để tự tải dữ liệu.")

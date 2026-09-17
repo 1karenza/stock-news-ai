@@ -5,10 +5,32 @@ from streamlit.testing.v1 import AppTest
 from equity_fixture import make_bundle
 from equity_data import company_events, comparable_rows, relative_valuation, source_date, EquityUnavailable, parse_cafef_ownership, ownership_chart_rows
 from equity_report import build_report
+from equity_pdf import build_pdf, news_report_rows
 from news_content import news_table
 
 
 class EquityTests(unittest.TestCase):
+    def test_pdf_news_columns_and_embedded_graphics(self):
+        row={'Ngày':'17/09/2026','Mã CK':'HPG','Source':'CafeF','Loại tin':'Doanh nghiệp',
+             'Tóm tắt thông tin':'Nội dung tiếng Việt & số liệu. '*150,'Tiêu đề bài báo':'Tiêu đề kiểm tra',
+             'Đọc tin gốc':'https://example.com','Tình trạng nguồn':'Đã tải'}
+        normalized=news_report_rows([row])[0]
+        self.assertEqual(list(normalized),['Ngày','Mã','Tóm tắt thông tin','Tiêu đề bài báo','Nguồn / Loại tin'])
+        self.assertEqual(normalized['Nguồn / Loại tin'],'CafeF\nDoanh nghiệp')
+        pdf=build_pdf(make_bundle('HPG'),[row],['HPG'])
+        self.assertTrue(pdf.startswith(b'%PDF-'))
+        self.assertIn(b'/FontFile2',pdf)
+
+    def test_top_ten_peers_sorted_by_market_cap(self):
+        c=make_bundle()['company']
+        candidates=[{'ticker':f'A{i}','marketCapVnd':i*1e9} for i in range(14)]
+        def fetch(code):
+            other=make_bundle(code)['company']; other['summary']['marketCap']=int(code[1:])*1e9
+            return other
+        rows,_=comparable_rows(c,fetch,lambda _:candidates)
+        self.assertEqual(len(rows),11)
+        self.assertEqual([r['Mã'] for r in rows[1:]],['A'+str(i) for i in range(13,3,-1)])
+
     def test_cafef_shareholders_and_invalid_pie_total(self):
         markup='<table><tr><td>Trần Đình Long</td><td>2.178.000.179</td><td>25,8</td><td>25/05/2026</td></tr><tr><td>Chủ tịch</td><td>Tên</td><td>65</td><td>Chi tiết</td></tr></table>'
         rows=parse_cafef_ownership(markup,'HPG')
@@ -63,6 +85,7 @@ class EquityTests(unittest.TestCase):
             self.assertFalse(app.exception)
             load.assert_called_with('FPT','3mo')
             self.assertNotIn('Tải biểu đồ giá',[b.label for b in app.button])
+            self.assertFalse(any('### Lịch sử chia cổ tức' in m.value or '### Phát hành thêm & thưởng cổ phiếu' in m.value for m in app.markdown))
             app.selectbox(key='equity_ticker').select('TCB').run()
             self.assertFalse(app.exception)
             load.assert_called_with('TCB','3mo')

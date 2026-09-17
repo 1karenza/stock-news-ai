@@ -169,22 +169,47 @@ def valuation_row(company):
             "Nguồn":company["source_url"]}
 
 
-def comparable_rows(company, fetcher=fetch_company):
+def industry_candidates(company):
+    s = company['summary']
+    sector, industry = s.get('bcEconomicSectorSlug'), s.get('bcIndustryGroupSlug')
+    if not sector or not industry:
+        return company.get('stocks', [])
+    try:
+        url = f'https://simplize.vn/co-phieu/nganh/{sector}/{industry}'
+        response = requests.get(url, timeout=(5,20))
+        response.raise_for_status()
+        node = BeautifulSoup(response.text, 'html.parser').find('script', id='__NEXT_DATA__')
+        page = json.loads(node.string)['props']['pageProps']
+        if page.get('subSlug') != industry:
+            raise ValueError('Wrong industry')
+        return [r for r in page['dataFilter'] if r.get('industrySlug') == industry]
+    except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise EquityUnavailable('Chưa tải được danh sách ngành; đang dùng các mã gợi ý của nguồn.') from exc
+
+
+def comparable_rows(company, fetcher=fetch_company, candidate_fetcher=industry_candidates):
     """Verify industry for each suggested peer; never assume related means same industry."""
     base = valuation_row(company)
-    candidates = list(dict.fromkeys(x.get("ticker") for x in company.get("stocks", []) if x.get("ticker") and x["ticker"] != company["ticker"]))[:5]
     rows, errors = [base], []
+    try:
+        candidates = candidate_fetcher(company)
+    except EquityUnavailable as exc:
+        errors.append(str(exc))
+        candidates = company.get('stocks', [])
+    candidates = sorted(candidates, key=lambda r:number(r.get('marketCapVnd')) or 0, reverse=True)
+    candidates = list(dict.fromkeys(x.get('ticker') for x in candidates if x.get('ticker') and x['ticker'] != company['ticker']))[:15]
     def get(code):
         try:
             return fetcher(code)
         except EquityUnavailable:
             return None
-    for code, other in zip(candidates, ThreadPoolExecutor(max_workers=3).map(get, candidates)):
-        if other is None:
-            errors.append(code)
-        elif company["summary"].get("bcIndustryGroupId") is not None and other["summary"].get("bcIndustryGroupId") == company["summary"]["bcIndustryGroupId"]:
-            rows.append(valuation_row(other))
-    return rows, errors
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for code, other in zip(candidates, pool.map(get, candidates)):
+            if other is None:
+                errors.append(code)
+            elif company['summary'].get('bcIndustryGroupId') is not None and other['summary'].get('bcIndustryGroupId') == company['summary']['bcIndustryGroupId']:
+                rows.append(valuation_row(other))
+    return rows[:1] + sorted(rows[1:], key=lambda r:r.get('Vốn hóa (tỷ đồng)') or 0, reverse=True)[:10], errors
 
 
 def relative_valuation(rows):
