@@ -102,19 +102,17 @@ def summary_sentences(item, detail=False):
 def news_table(rows):
     """Natural row heights; summary gets most of the available width."""
     cells = []
-    for row in rows:
+    for index, row in enumerate(rows, start=1):
         url = row["Đọc tin gốc"]
-        link = (f'<a href="{html.escape(url, quote=True)}" target="_blank" rel="noopener noreferrer">Mở bài ↗</a>'
-                if urlparse(url).scheme in ("http", "https") else "—")
         esc = lambda key: html.escape(str(row[key]))
-        source_note = ('<div class="small-muted">Chưa tải được bài gốc</div>'
-                       if row.get("Tình trạng nguồn") == "Chưa tải được bài gốc" else '')
+        title = html.escape(str(row.get('Tiêu đề bài báo', '')))
+        if urlparse(url).scheme in ('http', 'https'):
+            title = f'<a class="source-link" href="{html.escape(url, quote=True)}" target="_blank" rel="noopener noreferrer">{title} ↗</a>'
         cells.append(f'<tr><td data-label="Ngày / Mã"><strong>{esc("Mã CK")}</strong><br>{esc("Ngày")}</td>'
-                     f'<td data-label="Tóm tắt thông tin" class="news-summary">{esc("Tóm tắt thông tin")}</td>'
-                     f'<td data-label="Tiêu đề bài báo">{html.escape(str(row.get("Tiêu đề bài báo", "")))}</td>'
-                     f'<td data-label="Nguồn / Loại tin">{esc("Source")}<br><span class="small-muted">{esc("Loại tin")}</span><br>{link}{source_note}</td></tr>')
+                     f'<td data-label="Tiêu đề bài báo">{title}<br><span class="small-muted">{esc("Loại tin")}</span></td>'
+                     f'<td data-label="Tóm tắt"><a class="summary-jump" href="#news-detail-{index}" target="_self" title="Xem tóm tắt" aria-label="Xem tóm tắt tin {index}">↓</a></td></tr>')
     return ('<div class="news-table-wrap"><table class="news-table"><caption>Bảng tổng hợp tin chứng khoán</caption>'
-            '<colgroup><col style="width:10%"><col style="width:43%"><col style="width:29%"><col style="width:18%"></colgroup>'
-            '<thead><tr><th scope="col">Ngày / Mã</th><th scope="col">Tóm tắt thông tin</th>'
-            '<th scope="col">Tiêu đề bài báo</th><th scope="col">Nguồn / Loại tin</th></tr></thead>'
+            '<colgroup><col style="width:13%"><col style="width:77%"><col style="width:10%"></colgroup>'
+            '<thead><tr><th scope="col">Ngày / Mã</th><th scope="col">Tiêu đề bài báo / Loại tin</th>'
+            '<th scope="col">Tóm tắt</th></tr></thead>'
             '<tbody>' + ''.join(cells) + '</tbody></table></div>')

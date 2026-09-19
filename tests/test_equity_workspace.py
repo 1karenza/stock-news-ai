@@ -126,9 +126,16 @@ class EquityTests(unittest.TestCase):
             self.assertFalse(app.exception)
             load.assert_called_with('TCB','3mo')
             self.assertTrue(any('Định giá · TCB' in m.value for m in app.markdown))
+            app.selectbox(key='equity_ticker_prices').select('VIC').run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.selectbox(key='equity_ticker').value,'VIC')
+            self.assertEqual(app.selectbox(key='equity_ticker_valuation').value,'VIC')
+            load.assert_called_with('VIC','3mo')
 
     def test_news_title_column_precedes_source(self):
         row={'Ngày':'2026-09-17','Mã CK':'FPT','Tóm tắt thông tin':'Tóm tắt','Tiêu đề bài báo':'Tiêu đề',
              'Source':'Nguồn','Loại tin':'Doanh nghiệp','Đọc tin gốc':'https://example.com'}
         rendered=news_table([row])
-        self.assertLess(rendered.index('<th scope="col">Tiêu đề bài báo'), rendered.index('<th scope="col">Nguồn'))
+        self.assertLess(rendered.index('<th scope="col">Tiêu đề bài báo'), rendered.index('<th scope="col">Tóm tắt'))
+        self.assertNotIn('<th scope="col">Nguồn',rendered)
+        self.assertIn('href="#news-detail-1"',rendered)

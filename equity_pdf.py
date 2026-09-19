@@ -101,7 +101,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
         d.add(String(68,10,frame.date.min().strftime('%d/%m/%Y'),fontName=FONT,fontSize=8))
         d.add(String(width-85,10,frame.date.max().strftime('%d/%m/%Y'),fontName=FONT,fontSize=8))
         story.append(d)
-    section(f'I / Stock News - {bundle["ticker"]}')
+    section(f'I / Tin chứng khoán - {bundle["ticker"]}')
     now=datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).strftime('%d/%m/%Y %H:%M UTC+7')
     story.append(p(f'Xuất lúc {now}. Tin đã quét: {", ".join(searched_tickers)}. Mục II-IV: {bundle["ticker"]}.'))
     story.append(p('Nguồn: Google News / báo gốc (tin), Simplize (lịch và định giá), Yahoo Finance (giá), CafeF (cổ đông). Dữ liệu có thể trễ hoặc thiếu.'))
@@ -118,7 +118,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     line_chart(bundle['prices'],'close','Giá đóng cửa (VND/cổ phiếu)')
     line_chart(bundle['prices'],'volume','Khối lượng (cổ phiếu)',True)
     chart=ownership_chart_rows(bundle['ownership'])
-    if chart:
+    if chart or bundle.get('ownership_groups'):
         d=ownership_drawing(bundle['ownership'],bundle.get('ownership_groups',[]),bundle['ticker'])
         scale=width/d.width
         d.scale(scale,scale); d.width*=scale; d.height*=scale
@@ -133,7 +133,11 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     grid([{k:r.get(k) for k in cols} for r in bundle['peers']],[7,34,12,12,19,16])
     story.append(p('Chỉ số bổ sung',sub))
     cols=['Mã','Giá tham chiếu nguồn (đ/CP)','EPS (TTM, đ/CP)','BVPS (đ/CP)','ROE (%)']
-    grid([{k:r.get(k) for k in cols} for r in bundle['peers']],[10,27,25,25,13])
+    grid([{('EPS (đ/CP)' if k == 'EPS (TTM, đ/CP)' else k):r.get(k) for k in cols} for r in bundle['peers']],[10,27,25,25,13])
+    for row in bundle['peers']:
+        if row.get('Kỳ số liệu bổ sung'):
+            story.append(p(f"{row['Mã']} · {row['Kỳ số liệu bổ sung']}"))
+    story.append(p('Chỉ số bổ sung từ CafeF có thể thuộc kỳ cũ; không dùng các giá trị này để tính tham chiếu tương đối với bội số hiện tại.'))
     story.append(p('Tham chiếu tương đối',sub))
     story.append(p('EPS × trung vị P/E hoặc BVPS × trung vị P/B của các mã đối chiếu; loại mã đang tra và bội số không dương, cần ít nhất 2 mã. Không phải khuyến nghị đầu tư.'))
     grid(bundle['relative'])

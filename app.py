@@ -12,6 +12,7 @@ import streamlit as st
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from news_content import summary_sentences, news_table
+from news_cache import process_cached
 from news_fetch import ArticleUnavailable, read_source_article
 from investor_profile import (get_profile, persist_profile, watchlist_selector, workspace_view,
                               article_controls, article_id, mark_seen, changed)
@@ -496,7 +497,7 @@ st.markdown(
 
 profile = get_profile()
 tab_news, tab_calendar, tab_prices, tab_valuation = st.tabs(
-    ["I / Stock News", "II / Lịch doanh nghiệp", "III / Giá cổ phiếu", "IV / Định giá"])
+    ["I / Tin chứng khoán", "II / Lịch doanh nghiệp", "III / Giá cổ phiếu", "IV / Định giá"])
 
 
 # ============================================================
@@ -517,25 +518,38 @@ with tab_news:
         days = st.selectbox("Khoảng tin", [1, 3, 7, 14, 30], index=2, format_func=lambda value: f"{value} ngày gần nhất", key="news_days")
         max_items = st.slider("Số bài tối đa / mã", 5, 30, 12, 1, key="news_max")
         use_ai = st.toggle("Dùng AI để tóm tắt sâu", value=False, key="news_ai")
-        model = st.text_input(
-            "OpenAI model",
-            value=os.getenv("OPENAI_MODEL", "gpt-5.6-luna"),
-            disabled=not use_ai,
-            key="news_model",
-        )
-        run = st.button("Quét và phân tích  ↗", type="primary", width="stretch", key="news_run")
-        st.markdown('<div class="sidebar-footer"><span class="eyebrow">Made for perspective</span><br>Tin từ Google News · Tóm tắt theo yêu cầu</div>', unsafe_allow_html=True)
+        model = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+        if use_ai:
+            model = st.text_input("OpenAI model", value=model, key="news_model")
+        scan_col, report_col = st.columns([4,1], gap="small")
+        with scan_col:
+            run = st.button("Quét và phân tích  ↗", type="primary", width="stretch", key="news_run")
+        report_slot = report_col.empty()
+        st.caption("Tin vừa tải được dùng lại trong 15 phút. Đổi mã chỉ tải thêm phần chưa có.")
 
     tickers = parse_tickers(ticker_text)
-    with st.sidebar:
+    with tab_calendar:
         if st.session_state.get("equity_ticker") not in tickers:
             st.session_state["equity_ticker"] = tickers[0] if tickers else None
-        selected_ticker = st.selectbox("Mã đang phân tích (II–IV)", tickers, key="equity_ticker", disabled=not tickers)
+        def sync_equity_ticker(key):
+            value = st.session_state[key]
+            for other in ('equity_ticker','equity_ticker_prices','equity_ticker_valuation'):
+                st.session_state[other] = value
+        selected_ticker = st.selectbox("Mã đang phân tích", tickers, key="equity_ticker", disabled=not tickers,
+                                       on_change=sync_equity_ticker, args=('equity_ticker',))
+        st.caption("Mã được đồng bộ giữa ba tab để báo cáo 4 tab dùng cùng một doanh nghiệp.")
+    with tab_prices:
+        st.session_state['equity_ticker_prices'] = selected_ticker
+        st.selectbox("Mã đang phân tích", tickers, key="equity_ticker_prices", disabled=not tickers,
+                     on_change=sync_equity_ticker, args=('equity_ticker_prices',))
         price_period = st.selectbox("Khoảng biểu đồ giá", ["1mo","3mo","6mo","1y"], index=1,
                                    format_func={"1mo":"1 tháng","3mo":"3 tháng","6mo":"6 tháng","1y":"1 năm"}.get)
-        st.caption("Lịch, giá, cơ cấu cổ đông và định giá tự cập nhật theo mã này. Tin tức dùng nút Quét và phân tích.")
         if st.button("Làm mới dữ liệu doanh nghiệp"):
             load_equity.clear()
+    with tab_valuation:
+        st.session_state['equity_ticker_valuation'] = selected_ticker
+        st.selectbox("Mã đang phân tích", tickers, key="equity_ticker_valuation", disabled=not tickers,
+                     on_change=sync_equity_ticker, args=('equity_ticker_valuation',))
 
     if "merged_news" not in st.session_state:
         st.session_state.merged_news = []
@@ -561,7 +575,8 @@ with tab_news:
 
         for i, item in enumerate(merged):
             status.write(f"Đang đọc bài {i+1}/{len(merged)}: {item['title'][:80]}...")
-            processed.append(process_article(item, use_ai, model))
+            processed.append(process_cached(item, use_ai, model,
+                             st.session_state.setdefault('processed_news_cache', {}), process_article))
             progress.progress((i + 1) / max(1, len(merged)))
 
         status.empty()
@@ -619,6 +634,19 @@ with tab_news:
         overview_df = pd.DataFrame([make_table_row(x) for x in merged])
 
         st.markdown(news_table(overview_df.to_dict("records")), unsafe_allow_html=True)
+        # Streamlit intercepts Markdown hash links; handle our in-page links before it.
+        st.html('''<script>
+        if (window.stockNewsJump) document.removeEventListener('click', window.stockNewsJump, true);
+        window.stockNewsJump = function(event) {
+          const link = event.target.closest('a.summary-jump');
+          if (!link) return;
+          const target = document.getElementById(link.getAttribute('href').slice(1));
+          if (!target) return;
+          event.preventDefault(); event.stopImmediatePropagation();
+          target.scrollIntoView({block:'start', behavior:'instant'});
+        };
+        document.addEventListener('click', window.stockNewsJump, true);
+        </script>''', unsafe_allow_javascript=True)
 
         st.download_button(
             "Tải bảng tin CSV  ↓",
@@ -638,7 +666,8 @@ with tab_news:
             news_type = classify_news(body)
             bullets, quick = fallback_detailed_summary(item, item.get("article_text", ""))
 
-            with st.expander(f"{i}. [{tickers_text}] {item['title']}", expanded=(i == 1)):
+            st.markdown(f'<div id="news-detail-{i}" class="news-detail-anchor"></div>', unsafe_allow_html=True)
+            with st.expander(f"{i}. [{tickers_text}] {item['title']}", expanded=True):
                 article_controls(item, profile)
                 top1, top2, top3, top4 = st.columns([1, 1, 1, 1.25])
                 top1.write(f"**📅 Ngày:** {item['published']}")
@@ -681,13 +710,12 @@ if selected_ticker:
         render_equity_prices(equity)
     with tab_valuation:
         render_equity_valuation(equity)
-    with st.sidebar:
+    with report_slot.container():
         report_rows = [make_table_row(item) for item in all_merged]
-        st.download_button("Xuất report 4 tabs · PDF",
+        st.download_button("",
                            build_pdf(equity, report_rows, tickers, calendar_month=calendar_month),
                            file_name=f"stock-news-{selected_ticker}.pdf",
-                           mime="application/pdf", width="stretch")
-        st.caption("PDF khổ ngang, có biểu đồ và bảng số liệu. Mục II chỉ xuất tháng đang chọn trong Lịch doanh nghiệp; các mục khác theo mã đang phân tích.")
+                           mime="application/pdf", width="stretch", icon=":material/download:", help="Tải báo cáo", key="report_pdf")
 else:
     with tab_prices:
         st.info("Nhập mã cổ phiếu ở thanh bên để tự tải dữ liệu.")

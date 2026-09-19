@@ -123,7 +123,7 @@ class WorkspaceTests(unittest.TestCase):
         with patch("equity_views.load_equity", side_effect=make_bundle):
             app.run()
             self.assertFalse(app.exception)
-            self.assertEqual([t.label for t in app.tabs], ["I / Stock News", "II / Lịch doanh nghiệp", "III / Giá cổ phiếu", "IV / Định giá"])
+            self.assertEqual([t.label for t in app.tabs], ["I / Tin chứng khoán", "II / Lịch doanh nghiệp", "III / Giá cổ phiếu", "IV / Định giá"])
             app.button(key="read_"+article_id(ARTICLE)).click().run()
             app.button(key="save_"+article_id(ARTICLE)).click().run()
             self.assertFalse(app.exception)

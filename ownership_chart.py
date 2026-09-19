@@ -30,11 +30,16 @@ def ownership_drawing(rows, groups, ticker):
     d.add(Circle(cx,cy,90,fillColor=colors.white,strokeColor=colors.white))
     angle=90; inner_colors=['#244575','#40308c','#40968d']
     nonzero=[g for g in groups if g['Tỷ lệ (%)']>0]
+    if not chart and nonzero:
+        text(cx,565,'Phân loại sở hữu từ CafeF',13,anchor='middle')
+        text(cx,530,'Danh sách cổ đông có tỷ lệ chồng lặp; không vẽ vòng ngoài.',11,anchor='middle')
     for i,g in enumerate(nonzero):
         sweep=g['Tỷ lệ (%)']*3.6; color=inner_colors[i%3]
-        d.add(Wedge(cx,cy,73,angle-sweep,angle,fillColor=colors.HexColor(color),strokeColor=colors.white,strokeWidth=1))
+        d.add(Wedge(cx,cy,73 if chart else 145,angle-sweep,angle,fillColor=colors.HexColor(color),strokeColor=colors.white,strokeWidth=1))
         mid=math.radians(angle-sweep/2)
-        text(cx+math.cos(mid)*43,cy+math.sin(mid)*43-4,f"{g['Tỷ lệ (%)']:.2f}%",11,'#ffffff','middle')
+        if g['Tỷ lệ (%)'] >= 8:
+            label_radius = 43 if chart else 80
+            text(cx+math.cos(mid)*label_radius,cy+math.sin(mid)*label_radius-4,f"{g['Tỷ lệ (%)']:.2f}%",11,'#ffffff','middle')
         angle-=sweep
     if not nonzero:
         text(cx,cy,'Chưa có phân loại',9,anchor='middle')

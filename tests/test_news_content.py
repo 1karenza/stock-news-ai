@@ -51,10 +51,11 @@ class NewsContentTests(unittest.TestCase):
 
     def test_table_escapes_content_and_has_no_bond_column(self):
         row = {"Ngày": "11/09/2026", "Mã CK": "FPT", "Tóm tắt thông tin": '<script>alert(1)</script>',
+               "Tiêu đề bài báo": '<script>alert(1)</script>',
                "Source": "A & B", "Loại tin": "Doanh nghiệp", "Đọc tin gốc": "javascript:alert(1)"}
         result = news_table([row])
         self.assertNotIn('<script>', result)
-        self.assertNotIn('href=', result)
+        self.assertNotIn('href="javascript:', result)
         self.assertNotIn('Trái phiếu', result)
         self.assertIn('&lt;script&gt;', result)
 

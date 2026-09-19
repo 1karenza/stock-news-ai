@@ -1,6 +1,7 @@
 [theme]
 base = "light"
 primaryColor = "#88465F"
+linkColor = "#2563EB"
 backgroundColor = "#FDF8F3"
 secondaryBackgroundColor = "#F5F0EB"
 textColor = "#262626"

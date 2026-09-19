@@ -11,6 +11,8 @@ from investor_events import calendar_html, safe_url, stable_id
 from equity_data import fetch_ownership_structure
 from ownership_chart import ownership_drawing
 from reportlab.graphics import renderSVG
+import html
+from urllib.parse import urlparse
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -49,24 +51,38 @@ def data_table(rows):
     if not rows:
         st.info("Nguồn chưa cung cấp dữ liệu cho mục này.")
         return
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
-                 column_config={"Nguồn":st.column_config.LinkColumn("Nguồn",display_text="Mở nguồn")})
+    frame = pd.DataFrame(rows).drop(columns=['Chỉ số bổ sung'], errors='ignore')
+    frame = frame.rename(columns={'EPS (TTM, đ/CP)':'EPS (đ/CP; xem kỳ bổ sung)'})
+    if 'Số cổ phiếu' in frame:
+        frame['Số cổ phiếu'] = frame['Số cổ phiếu'].map(lambda x: f'{x:,.0f}' if pd.notna(x) else '—')
+    configs = {}
+    for col in ('Nguồn', 'Nguồn bổ sung'):
+        if col not in frame:
+            continue
+        # Split mixed providers so each link has an accurate, readable label.
+        urls = frame.pop(col)
+        for host in sorted({urlparse(str(u)).hostname for u in urls if safe_url(str(u))} - {None}):
+            label = {'cafef.vn':'CafeF','simplize.vn':'Simplize','finance.yahoo.com':'Yahoo Finance'}.get(host, host.removeprefix('www.'))
+            name = label if label not in frame else label + ' · Bổ sung'
+            frame[name] = urls.map(lambda u: u if urlparse(str(u)).hostname == host else None)
+            configs[name] = st.column_config.LinkColumn(name, display_text=label+' ↗')
+    st.dataframe(frame, hide_index=True, width="stretch", column_config=configs)
 
 
 def provenance(bundle):
     c = bundle["company"]
     if c:
-        st.caption(f'Simplize · ngày cập nhật trang: {c["summary"].get("analysisUpdated", "chưa rõ")} · tải lúc {c["fetched"]}. Chỉ số có thể khác kỳ cập nhật; không phải báo giá trực tiếp.')
-        st.link_button("Đối chiếu hồ sơ nguồn", c["source_url"])
+        st.caption(f'Simplize · Ngày cập nhật trang: {c["summary"].get("analysisUpdated", "Chưa rõ")} · Tải lúc {c["fetched"]}. Chỉ số có thể khác kỳ cập nhật; không phải báo giá trực tiếp.')
+        st.markdown(f'<a class="source-link" target="_blank" rel="noopener noreferrer" href="{html.escape(c["source_url"], quote=True)}">Simplize ↗</a>', unsafe_allow_html=True)
 
 
 def render_equity_prices(bundle):
     ticker, frame = bundle["ticker"], bundle["prices"]
     st.markdown(f"### Giá cổ phiếu {ticker}")
-    st.caption("Tự tải theo mã và khoảng thời gian ở thanh bên trái.")
+    st.caption("Tự tải theo mã và khoảng thời gian đang chọn ở đầu tab.")
     if not frame.empty:
         meta = bundle["price_meta"]
-        st.caption(f'{meta["source"]} · VND/cổ phiếu · phiên cuối {frame.date.max():%d/%m/%Y} · tải lúc {meta["fetched"]} (UTC+7)')
+        st.caption(f'{meta["source"]} · VND/cổ phiếu · Phiên cuối {frame.date.max():%d/%m/%Y} · Tải lúc {meta["fetched"]} (UTC+7)')
         st.caption(meta["adjustment"])
         st.altair_chart(alt.Chart(frame).mark_line(color="#88465f").encode(
             x=alt.X("date:T", title="Ngày"), y=alt.Y("close:Q", title="Giá (đ/CP)",scale=alt.Scale(zero=False)),
@@ -78,14 +94,14 @@ def render_equity_prices(bundle):
     st.markdown("### Cơ cấu sở hữu · CafeF")
     ownership = bundle["ownership"]
     chart_rows = ownership_chart_rows(ownership)
-    if chart_rows:
+    if chart_rows or bundle.get('ownership_groups'):
         drawing = ownership_drawing(ownership, bundle.get('ownership_groups',[]), ticker)
         svg = renderSVG.drawToString(drawing)
         st.image(svg, width='stretch')
     elif ownership:
         st.info("Các công bố có thể khác ngày hoặc chồng lặp; tổng tỷ lệ vượt 100% nên chỉ hiển thị bảng gốc.")
     data_table(ownership)
-    st.caption("Nguồn CafeF · vòng ngoài: cổ đông sở hữu từ 1% và phần còn lại; vòng trong: sở hữu nước ngoài, nhà nước và khác. Hai vòng là hai cách phân loại riêng, không cộng chung. Ngày công bố từng cổ đông có thể khác nhau.")
+    st.caption("Nguồn CafeF · Vòng ngoài: cổ đông sở hữu từ 1% và phần còn lại; vòng trong: sở hữu nước ngoài, nhà nước và khác. Hai vòng là hai cách phân loại riêng, không cộng chung. Khi danh sách chồng lặp, chỉ vẽ phân loại sở hữu hợp lệ. Ngày công bố từng cổ đông có thể khác nhau.")
     provenance(bundle)
 
 
@@ -104,6 +120,7 @@ def render_equity_calendar(bundle):
                         "title":r["Nhóm"] + " · " + r["Loại ngày"],"milestone":"manual",
                         "tickers":[r["Mã"]],"status":"announced"} for r in shown]
     st.markdown(calendar_html(year,m,calendar_events),unsafe_allow_html=True)
+    st.markdown('<div style="height:2rem" aria-hidden="true"></div>', unsafe_allow_html=True)
     data_table(shown)
     st.markdown("### Những mốc đã qua")
     historical = [r for r in rows if r["Ngày"]<=date.today().isoformat()]
@@ -127,6 +144,7 @@ def render_equity_valuation(bundle):
     st.markdown("#### So sánh doanh nghiệp cùng ngành")
     st.caption("Tối đa 10 mã đối chiếu ngoài mã đang tra, ưu tiên vốn hóa lớn trong danh sách ngành nguồn trả về; xác minh cùng mã nhóm ngành và xếp theo vốn hóa. Ngành ít mã có thể không đủ 10; đây không phải xếp hạng chất lượng đầu tư.")
     data_table(peers)
+    st.caption('EPS, BVPS và ROE còn thiếu được bổ sung từ CafeF khi có dữ liệu. Xem cột Kỳ số liệu bổ sung; số liệu cũ không dùng để tính giá tham chiếu tương đối. Ô trống là nguồn chưa cung cấp, không thay bằng số 0.')
     chart_rows = [{"Mã":r["Mã"],"Chỉ số":k,"Giá trị":r[k]} for r in peers for k in ("P/E (TTM)","P/B (FQ)") if r[k] is not None and r[k]>0]
     if chart_rows:
         st.altair_chart(alt.Chart(pd.DataFrame(chart_rows)).mark_bar().encode(x="Mã:N", y="Giá trị:Q",color=alt.Color("Chỉ số:N",scale=alt.Scale(range=["#88465f","#e4a4bd"])),column="Chỉ số:N",tooltip=["Mã:N","Chỉ số:N","Giá trị:Q"]),width="stretch")

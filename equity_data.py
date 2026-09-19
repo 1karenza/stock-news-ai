@@ -51,7 +51,8 @@ def fetch_company(ticker):
     data["ticker"] = ticker
     data["source_url"] = url
     data["fetched"] = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).isoformat(timespec="seconds")
-    return data
+    from financial_fallback import supplement
+    return supplement(data)
 
 
 def fetch_ownership(ticker):
@@ -94,7 +95,7 @@ def parse_ownership_structure(data, ticker):
         pct=number(data.get(key))
         if pct is not None and 0 <= pct <= 100:
             groups.append({'Nhóm':label,'Tỷ lệ (%)':pct})
-    if not rows:
+    if not rows and not groups:
         raise ValueError('No shareholders')
     if len(groups)!=3 or abs(sum(r['Tỷ lệ (%)'] for r in groups)-100)>.1:
         groups=[]
@@ -203,7 +204,10 @@ def valuation_row(company):
             "P/B (FQ)":number(s.get("pbRatio")), "Vốn hóa (tỷ đồng)":cap/1e9 if cap is not None else None,
             "EPS (TTM, đ/CP)":number(s.get("epsRatio")), "BVPS (đ/CP)":number(s.get("bookValue")),
             "ROE (%)":number(s.get("roe")), "Nguồn cập nhật":s.get("analysisUpdated", "Chưa rõ"),
-            "Nguồn":company["source_url"]}
+            "Nguồn":company["source_url"],
+            "Kỳ số liệu bổ sung":'; '.join(f'{dict(epsRatio="EPS",bookValue="BVPS",roe="ROE")[k]}: {v}' for k,v in company.get('metric_notes',{}).items()),
+            "Nguồn bổ sung":f'https://cafef.vn/du-lieu/Ajax/PageNew/ChiSoTaiChinh.ashx?Symbol={company["ticker"]}' if company.get('metric_notes') else '',
+            "Chỉ số bổ sung":', '.join(company.get('metric_notes',{}))}
 
 
 def industry_candidates(company):
@@ -256,6 +260,8 @@ def relative_valuation(rows):
         return result
     target = rows[0]
     for multiple, base in [("P/E (TTM)","EPS (TTM, đ/CP)"),("P/B (FQ)","BVPS (đ/CP)")]:
+        if ('epsRatio' if multiple == 'P/E (TTM)' else 'bookValue') in target.get('Chỉ số bổ sung', ''):
+            continue  # Historical fallback must not be paired with current peer multiples.
         peers = [r[multiple] for r in rows[1:] if number(r.get(multiple)) is not None and r[multiple] > 0]
         amount = number(target.get(base))
         if len(peers) >= 2 and amount is not None and amount > 0:
