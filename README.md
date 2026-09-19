@@ -31,8 +31,9 @@ Riêng mục II chỉ xuất sự kiện thuộc **Tháng có sự kiện** đan
 - Google News RSS và bài gốc cho tin tức; nếu bài gốc không đọc được, app chỉ
   sử dụng nội dung nguồn có sẵn, không tự tạo chi tiết.
 - CafeF cho danh sách cổ đông, số cổ phiếu, tỷ lệ và ngày cập nhật từng công bố.
-  Biểu đồ hiện 12 cổ đông lớn nhất và phần còn lại; không vẽ khi tổng vượt 100%.
-  Chưa có tỷ lệ sở hữu nước ngoài xác minh được; không suy ra từ room ngoại.
+  Biểu đồ hai vòng từ API CoCauSoHuu của CafeF: vòng ngoài gồm cổ đông từ 1%
+  và phần còn lại; vòng trong gồm nước ngoài/nhà nước/khác. Hai cách phân loại
+  độc lập, không cộng chung. App và PDF dùng cùng biểu đồ vector.
 - Simplize cho hồ sơ, quyền cổ đông, chỉ số và báo cáo phân tích.
   Lịch sử giới hạn ở bản ghi nguồn trả về, tối đa 100 sự kiện quyền và các
   thông báo gần đây. Ngày công bố không thay thế ngày thực hiện; ngày đã qua

@@ -10,6 +10,24 @@ from news_content import news_table
 
 
 class EquityTests(unittest.TestCase):
+    def test_cafef_two_ring_data_and_one_percent_threshold(self):
+        from equity_data import parse_ownership_structure
+        from ownership_chart import ownership_drawing
+        from reportlab.graphics import renderSVG
+        raw={'CoDongSoHuu':[{'Name':'Cổ đông A','AssetRate':'25,8','AssetVolume':'2.178.000','UpdatedDate':'25/05/2026'},
+                            {'Name':'Cổ đông nhỏ','AssetRate':'0,9','AssetVolume':'900','UpdatedDate':'25/05/2026'}],
+             'NuocNgoai':21.74,'NhaNuoc':0,'Khac':78.26}
+        parsed=parse_ownership_structure(raw,'HPG')
+        self.assertEqual(parsed['groups'][0]['Tỷ lệ (%)'],21.74)
+        outer=ownership_chart_rows(parsed['rows'])
+        self.assertEqual(len(outer),2)
+        self.assertEqual(outer[-1]['Tỷ lệ (%)'],74.2)
+        svg=renderSVG.drawToString(ownership_drawing(parsed['rows'],parsed['groups'],'HPG'))
+        self.assertIn('21.74%',svg)
+        self.assertIn('78.26%',svg)
+        raw['NuocNgoai']=None
+        self.assertEqual(parse_ownership_structure(raw,'HPG')['groups'],[])
+
     def test_pdf_calendar_matches_selected_month(self):
         bundle=make_bundle()
         month, rows=report_calendar_rows(bundle,'2026-05')

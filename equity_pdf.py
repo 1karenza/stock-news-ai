@@ -14,6 +14,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, 
 from reportlab.graphics.shapes import Drawing, Line, PolyLine, Circle, Wedge, String
 
 from equity_data import ownership_chart_rows, source_date, text_only
+from ownership_chart import ownership_drawing
 
 FONT = 'ReportVN'
 ROSE = colors.HexColor('#88465f')
@@ -108,23 +109,14 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     line_chart(bundle['prices'],'volume','Khối lượng (cổ phiếu)',True)
     chart=ownership_chart_rows(bundle['ownership'])
     if chart:
-        d=Drawing(235,245); angle=90
-        legend=[]
-        for i,row in enumerate(chart):
-            sweep=row['Tỷ lệ (%)']*3.6; color=colors.HexColor(PALETTE[i%len(PALETTE)])
-            if sweep>0:
-                d.add(Wedge(115,125,95,angle-sweep,angle,fillColor=color,strokeColor=colors.white,strokeWidth=.7))
-            angle-=sweep
-            legend.append([Paragraph(f'<font color="{PALETTE[i%len(PALETTE)]}">●</font> '+escape(row['Cổ đông']),small),p(f'{row["Tỷ lệ (%)"]:.2f}%',small)])
-        d.add(Circle(115,125,53,fillColor=colors.white,strokeColor=colors.white))
-        d.add(String(115,122,bundle['ticker'],fontName=FONT,fontSize=16,textAnchor='middle',fillColor=ROSE))
-        labels=Table(legend,colWidths=[width-310,65],style=[('VALIGN',(0,0),(-1,-1),'TOP'),('BOTTOMPADDING',(0,0),(-1,-1),5)])
-        graphic=Table([[d,labels]],colWidths=[245,width-245],style=[('VALIGN',(0,0),(-1,-1),'MIDDLE')])
-        story.append(KeepTogether([p('Cơ cấu sở hữu - CafeF',sub),graphic]))
+        d=ownership_drawing(bundle['ownership'],bundle.get('ownership_groups',[]),bundle['ticker'])
+        scale=width/d.width
+        d.scale(scale,scale); d.width*=scale; d.height*=scale
+        story.append(d)
     else:
         story.append(p('Cơ cấu sở hữu - CafeF',sub))
         story.append(p('Chưa đủ dữ liệu để vẽ biểu đồ tròn hoặc tổng tỷ lệ công bố vượt 100%.'))
-    story.append(p('Biểu đồ: 12 cổ đông lớn nhất và phần còn lại. Ngày công bố có thể khác nhau; chưa có tỷ lệ sở hữu nước ngoài xác minh được.'))
+    story.append(p('Nguồn CafeF. Vòng ngoài: cổ đông sở hữu từ 1% và phần còn lại. Vòng trong: nước ngoài, nhà nước, khác; hai cách phân loại độc lập. Ngày công bố có thể khác nhau.'))
     grid([{k:r.get(k) for k in ['Cổ đông','Tỷ lệ (%)','Số cổ phiếu','Tính đến ngày']} for r in bundle['ownership']],[52,13,20,15])
     section(f'IV / Định giá - {bundle["ticker"]}')
     story.append(p('Tối đa 10 mã đối chiếu cùng nhóm ngành ngoài mã đang tra, ưu tiên vốn hóa lớn trong danh sách nguồn trả về. P/E: TTM; P/B: quý gần nhất.'))

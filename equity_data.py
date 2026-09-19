@@ -65,6 +65,42 @@ def fetch_ownership(ticker):
         raise EquityUnavailable(f"Chưa tải được cơ cấu cổ đông {ticker} từ CafeF.") from exc
 
 
+def fetch_ownership_structure(ticker):
+    ticker = valid_ticker(ticker)
+    url = 'https://cafef.vn/du-lieu/Ajax/PageNew/CoCauSoHuu.ashx'
+    try:
+        response = requests.get(url, params={'Symbol':ticker}, timeout=(5,20))
+        response.raise_for_status()
+        payload = response.json()
+        if not payload.get('Success') or not isinstance(payload.get('Data'),dict):
+            raise ValueError('Missing ownership')
+        return parse_ownership_structure(payload['Data'], ticker)
+    except (requests.RequestException, ValueError, TypeError, AttributeError) as exc:
+        raise EquityUnavailable(f'Chưa tải được biểu đồ sở hữu {ticker} từ CafeF.') from exc
+
+
+def parse_ownership_structure(data, ticker):
+    rows=[]
+    for r in data.get('CoDongSoHuu') or []:
+        pct=number(str(r.get('AssetRate','')).replace(',','.'))
+        shares=number(str(r.get('AssetVolume','')).replace('.','').replace(',',''))
+        if pct is not None and 0 <= pct <= 100:
+            rows.append({'Cổ đông':text_only(r.get('Name')), 'Tỷ lệ (%)':pct,
+                         'Số cổ phiếu':int(shares) if shares is not None else None,
+                         'Tính đến ngày':r.get('UpdatedDate',''),
+                         'Nguồn':f'https://cafef.vn/du-lieu/Ajax/PageNew/CoCauSoHuu.ashx?Symbol={ticker}'})
+    groups=[]
+    for key,label in [('NuocNgoai','Sở hữu nước ngoài'),('NhaNuoc','Sở hữu nhà nước'),('Khac','Sở hữu khác')]:
+        pct=number(data.get(key))
+        if pct is not None and 0 <= pct <= 100:
+            groups.append({'Nhóm':label,'Tỷ lệ (%)':pct})
+    if not rows:
+        raise ValueError('No shareholders')
+    if len(groups)!=3 or abs(sum(r['Tỷ lệ (%)'] for r in groups)-100)>.1:
+        groups=[]
+    return {'rows':rows,'groups':groups}
+
+
 def parse_cafef_ownership(markup, ticker):
     """Read the shareholder table, not the board-members table or foreign room."""
     soup = BeautifulSoup(markup, "html.parser")
@@ -88,10 +124,11 @@ def parse_cafef_ownership(markup, ticker):
 
 def ownership_chart_rows(rows):
     """Never silently normalize overlapping/stale disclosures into 100%."""
-    if not rows or sum(r["Tỷ lệ (%)"] for r in rows) > 100.05:
+    selected = [r for r in rows if r['Tỷ lệ (%)'] >= 1]
+    if not selected or sum(r["Tỷ lệ (%)"] for r in selected) > 100.05:
         return []
     result = [{"Cổ đông":r["Cổ đông"],"Tỷ lệ (%)":r["Tỷ lệ (%)"]}
-              for r in sorted(rows,key=lambda r:r["Tỷ lệ (%)"],reverse=True)[:12]]
+              for r in sorted(selected,key=lambda r:r["Tỷ lệ (%)"],reverse=True)]
     remaining = round(100-sum(r["Tỷ lệ (%)"] for r in result),2)
     if remaining > 0:
         result.append({"Cổ đông":"Khác / phần còn lại","Tỷ lệ (%)":remaining})

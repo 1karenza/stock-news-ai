@@ -8,6 +8,9 @@ from equity_data import (fetch_company, fetch_ownership, fetch_events, comparabl
                          company_events, relative_valuation, EquityUnavailable, source_date, text_only, ownership_chart_rows)
 from market_prices import fetch_prices, PriceUnavailable
 from investor_events import calendar_html, safe_url, stable_id
+from equity_data import fetch_ownership_structure
+from ownership_chart import ownership_drawing
+from reportlab.graphics import renderSVG
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -15,13 +18,16 @@ def load_equity(ticker, period):
     bundle = {"ticker":ticker,"period":period,"errors":[],"company":{},"ownership":[],
               "events":[],"peers":[],"relative":[],"prices":pd.DataFrame(),"price_meta":{}}
     with ThreadPoolExecutor(max_workers=4) as pool:
-        jobs = {"company":pool.submit(fetch_company,ticker), "ownership":pool.submit(fetch_ownership,ticker),
+        jobs = {"company":pool.submit(fetch_company,ticker), "ownership_snapshot":pool.submit(fetch_ownership_structure,ticker),
                 "events_raw":pool.submit(fetch_events,ticker), "price":pool.submit(fetch_prices,ticker,period)}
         for name, job in jobs.items():
             try:
                 value = job.result()
                 if name=="price":
                     bundle["prices"], bundle["price_meta"] = value
+                elif name=='ownership_snapshot':
+                    bundle['ownership'] = value['rows']
+                    bundle['ownership_groups'] = value['groups']
                 else:
                     bundle[name] = value
             except (EquityUnavailable, PriceUnavailable) as exc:
@@ -73,13 +79,13 @@ def render_equity_prices(bundle):
     ownership = bundle["ownership"]
     chart_rows = ownership_chart_rows(ownership)
     if chart_rows:
-        st.altair_chart(alt.Chart(pd.DataFrame(chart_rows)).mark_arc(innerRadius=85).encode(
-            theta=alt.Theta("Tỷ lệ (%):Q"),color=alt.Color("Cổ đông:N",legend=alt.Legend(orient="bottom",columns=1)),
-            tooltip=["Cổ đông:N",alt.Tooltip("Tỷ lệ (%):Q",format=".2f")]).properties(height=360),width="stretch")
+        drawing = ownership_drawing(ownership, bundle.get('ownership_groups',[]), ticker)
+        svg = renderSVG.drawToString(drawing)
+        st.image(svg, width='stretch')
     elif ownership:
         st.info("Các công bố có thể khác ngày hoặc chồng lặp; tổng tỷ lệ vượt 100% nên chỉ hiển thị bảng gốc.")
     data_table(ownership)
-    st.caption("Nguồn CafeF · ngày cập nhật của từng cổ đông nằm trong bảng. Biểu đồ hiển thị 12 cổ đông lớn nhất; phần còn lại = 100% trừ các tỷ lệ hiển thị. Các công bố có thể khác ngày, không phải ảnh chụp sở hữu cùng thời điểm. Chưa có tỷ lệ sở hữu nước ngoài xác minh được từ nguồn này; room ngoại không được dùng thay thế.")
+    st.caption("Nguồn CafeF · vòng ngoài: cổ đông sở hữu từ 1% và phần còn lại; vòng trong: sở hữu nước ngoài, nhà nước và khác. Hai vòng là hai cách phân loại riêng, không cộng chung. Ngày công bố từng cổ đông có thể khác nhau.")
     provenance(bundle)
 
 
