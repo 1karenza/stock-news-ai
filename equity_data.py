@@ -98,7 +98,7 @@ def parse_ownership_structure(data, ticker):
         raise ValueError('No shareholders')
     if len(groups)!=3 or abs(sum(r['Tỷ lệ (%)'] for r in groups)-100)>.1:
         groups=[]
-    return {'rows':rows,'groups':groups}
+    return {'rows':sorted(rows, key=lambda row: row['Tỷ lệ (%)'], reverse=True),'groups':groups}
 
 
 def parse_cafef_ownership(markup, ticker):
