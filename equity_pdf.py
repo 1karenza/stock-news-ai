@@ -128,12 +128,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     story.append(p('Tham chiếu tương đối',sub))
     story.append(p('EPS × trung vị P/E hoặc BVPS × trung vị P/B của các mã đối chiếu; loại mã đang tra và bội số không dương, cần ít nhất 2 mã. Không phải khuyến nghị đầu tư.'))
     grid(bundle['relative'])
-    story.append(p('Giá mục tiêu từ báo cáo phân tích',sub))
-    reports=[{'Ngày':source_date(r.get('issueDate')),'Đơn vị':r.get('source',''),
-              'Giá mục tiêu (đ/CP)':r.get('targetPrice'),'Tiêu đề':text_only(r.get('title'))}
-             for r in bundle['company'].get('analysisReports',[])]
-    grid(reports,[12,15,18,55])
-    story.append(p('Giá mục tiêu phụ thuộc giả định tại ngày báo cáo. Chỉ số thấp chưa đủ để kết luận cổ phiếu rẻ.'))
+    story.append(p('Chỉ số thấp chưa đủ để kết luận cổ phiếu rẻ.'))
     def footer(canvas,document):
         canvas.setFont(FONT,8); canvas.setFillColor(ROSE)
         canvas.drawString(32,18,f'Stock News | {bundle["ticker"]} | {now}')

@@ -136,11 +136,5 @@ def render_equity_valuation(bundle):
         st.caption("App tính EPS × trung vị P/E hoặc BVPS × trung vị P/B của các mã đối chiếu, loại mã đang tra và bội số không dương; cần ít nhất 2 mã hợp lệ. Đây là phép tính tương đối từ dữ liệu nguồn, không phải giá mục tiêu do tổ chức phân tích công bố.")
     else:
         st.info("Chưa đủ ít nhất 2 mã có bội số dương hoặc EPS/BVPS của mã đang tra không dương để tính tham chiếu tương đối.")
-    st.markdown("#### Giá mục tiêu từ báo cáo phân tích")
-    reports=[]
-    for r in bundle["company"].get("analysisReports",[]):
-        reports.append({"Ngày báo cáo":source_date(r.get("issueDate")),"Đơn vị":r.get("source",""),
-                        "Giá mục tiêu (đ/CP)":r.get("targetPrice"),"Tiêu đề":text_only(r.get("title")),"Nguồn":safe_url(r.get("attachedLink"))})
-    data_table(reports)
-    st.caption("Giá mục tiêu phản ánh quan điểm và giả định tại ngày báo cáo; có thể đã cũ. P/E, P/B thấp chưa đủ để kết luận cổ phiếu rẻ.")
+    st.caption("P/E, P/B thấp chưa đủ để kết luận cổ phiếu rẻ.")
     provenance(bundle)

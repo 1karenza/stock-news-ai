@@ -63,9 +63,6 @@ def build_report(bundle, news_rows, searched_tickers, calendar_month=None):
     month, selected_events = report_calendar_rows(bundle, calendar_month)
     ticker=html.escape(bundle['ticker'])
     company=bundle['company']
-    reports=[{"Ngày":source_date(r.get('issueDate')),"Đơn vị":r.get('source',''),
-              "Giá mục tiêu (đ/CP)":r.get('targetPrice'),"Tiêu đề":text_only(r.get('title')),
-              "Nguồn":safe_url(r.get('attachedLink'))} for r in company.get('analysisReports',[])]
     provenance=(f'Simplize · cập nhật trang: {company["summary"].get("analysisUpdated","chưa rõ")} · tải {company["fetched"]}' if company else 'Chưa có hồ sơ doanh nghiệp')
     price_note=' · '.join(str(v) for v in bundle['price_meta'].values())
     errors=''.join('<p>'+html.escape(e)+'</p>' for e in bundle['errors'])
@@ -88,5 +85,5 @@ def build_report(bundle, news_rows, searched_tickers, calendar_month=None):
     <h3>Dữ liệu giá</h3>{table(bundle['prices'].assign(date=bundle['prices'].date.dt.strftime('%Y-%m-%d')).to_dict('records') if not bundle['prices'].empty else [])}</section>
     <section><h2>IV / Định giá</h2><p>P/E: TTM · P/B: quý gần nhất. Mẫu cùng nhóm ngành, không phải toàn ngành.</p>{table(bundle['peers'])}
     <h3>Tham chiếu tương đối</h3><p>EPS × trung vị P/E hoặc BVPS × trung vị P/B; loại mã đang tra và bội số không dương, cần ít nhất 2 mã. Đây là phép tính của app, không phải giá mục tiêu từ báo cáo.</p>{table(bundle['relative'])}
-    <h3>Giá mục tiêu từ báo cáo phân tích</h3>{table(reports)}</section>
-    <footer>Dữ liệu tham khảo có thể trễ hoặc thiếu. Giá mục tiêu phụ thuộc giả định tại ngày báo cáo; bội số thấp chưa đủ để kết luận cổ phiếu rẻ.</footer></html>'''
+    </section>
+    <footer>Dữ liệu tham khảo có thể trễ hoặc thiếu. Bội số thấp chưa đủ để kết luận cổ phiếu rẻ.</footer></html>'''

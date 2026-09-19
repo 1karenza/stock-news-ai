@@ -14,7 +14,7 @@
    Lịch cổ tức và phát hành được xem tại mục II, không lặp lại bên dưới mục III.
 4. **IV / Định giá**: P/E, P/B, vốn hóa từ nguồn công khai; đối chiếu tối đa
    10 mã đối chiếu cùng mã nhóm ngành ngoài mã đang tra, ưu tiên vốn hóa lớn
-   trong danh sách ngành nguồn trả về; tham chiếu tương đối và báo cáo giá mục tiêu.
+   trong danh sách ngành nguồn trả về và tham chiếu tương đối.
 
 Nhập mã ở thanh trái; chọn **Mã đang phân tích (II–IV)** và khoảng biểu đồ.
 Các tab II–IV tự tải, không cần bấm quét. Tin ở tab I dùng **Quét và phân tích**.
@@ -34,7 +34,7 @@ Riêng mục II chỉ xuất sự kiện thuộc **Tháng có sự kiện** đan
   Biểu đồ hai vòng từ API CoCauSoHuu của CafeF: vòng ngoài gồm cổ đông từ 1%
   và phần còn lại; vòng trong gồm nước ngoài/nhà nước/khác. Hai cách phân loại
   độc lập, không cộng chung. App và PDF dùng cùng biểu đồ vector.
-- Simplize cho hồ sơ, quyền cổ đông, chỉ số và báo cáo phân tích.
+- Simplize cho hồ sơ, quyền cổ đông và chỉ số định giá.
   Lịch sử giới hạn ở bản ghi nguồn trả về, tối đa 100 sự kiện quyền và các
   thông báo gần đây. Ngày công bố không thay thế ngày thực hiện; ngày đã qua
   không tự chứng minh sự kiện hoàn tất.
