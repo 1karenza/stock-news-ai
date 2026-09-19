@@ -22,6 +22,15 @@ PALETTE = ['#88465f','#e4a4bd','#7a8e9c','#aa9984','#526b68','#c3afcc',
            '#89b4cf','#a5c9aa','#d4ab78','#a98199','#7188b0','#b8bf80','#d7d0cb']
 
 
+class NewsTable(Table):
+    """A continuation (and its repeated header) always starts a new page."""
+    def split(self, availWidth, availHeight):
+        parts = super().split(availWidth, availHeight)
+        if len(parts) > 1:
+            return [parts[0], PageBreak(), *parts[1:]]
+        return parts
+
+
 def news_report_rows(rows):
     return [{'Ngày':r.get('Ngày',''), 'Mã':r.get('Mã CK',''),
              'Tóm tắt thông tin':r.get('Tóm tắt thông tin',''),
@@ -57,7 +66,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     def section(title):
         if story: story.append(PageBreak())
         story.append(p(title,heading))
-    def grid(rows,weights=None):
+    def grid(rows,weights=None,news=False):
         if not rows:
             story.append(p('Chưa có dữ liệu từ nguồn tại thời điểm xuất.')); return
         keys=list(rows[0])
@@ -65,7 +74,8 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
         data=[[p(k,small) for k in keys]]
         for row in rows:
             data.append([p(row.get(k),small) for k in keys])
-        tab=Table(data,colWidths=[width*w/sum(weights) for w in weights],repeatRows=1,splitByRow=1,splitInRow=1)
+        table_class = NewsTable if news else Table
+        tab=table_class(data,colWidths=[width*w/sum(weights) for w in weights],repeatRows=1,splitByRow=1,splitInRow=1)
         tab.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#f0e7e9')),
             ('VALIGN',(0,0),(-1,-1),'TOP'),('GRID',(0,0),(-1,-1),.35,colors.HexColor('#ded7d2')),
             ('LEFTPADDING',(0,0),(-1,-1),7),('RIGHTPADDING',(0,0),(-1,-1),7),
@@ -96,7 +106,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     story.append(p(f'Xuất lúc {now}. Tin đã quét: {", ".join(searched_tickers)}. Mục II-IV: {bundle["ticker"]}.'))
     story.append(p('Nguồn: Google News / báo gốc (tin), Simplize (lịch và định giá), Yahoo Finance (giá), CafeF (cổ đông). Dữ liệu có thể trễ hoặc thiếu.'))
     for error in bundle['errors']: story.append(p(error))
-    grid(news_report_rows(news_rows),[10,6,40,27,17])
+    grid(news_report_rows(news_rows),[10,6,40,27,17],news=True)
     section(f'II / Lịch doanh nghiệp - {bundle["ticker"]}')
     month, selected_events = report_calendar_rows(bundle, calendar_month)
     story.append(p(f'Tháng đang tra cứu: {month[5:7]}/{month[:4]}' if month else 'Chưa có tháng tra cứu.'))
