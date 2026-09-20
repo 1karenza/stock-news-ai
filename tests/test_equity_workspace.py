@@ -74,7 +74,7 @@ class EquityTests(unittest.TestCase):
         self.assertEqual(rows[0]['Số cổ phiếu'],2178000179)
         self.assertEqual(rows[0]['Tỷ lệ (%)'],25.8)
         self.assertEqual(ownership_chart_rows(rows)[-1]['Tỷ lệ (%)'],74.2)
-        self.assertEqual(ownership_chart_rows(rows*4),[])
+        self.assertEqual(len(ownership_chart_rows(rows*4)),4)
         with self.assertRaises(EquityUnavailable):
             parse_cafef_ownership('<html>Unavailable</html>','HPG')
 

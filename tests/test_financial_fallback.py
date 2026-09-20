@@ -12,7 +12,7 @@ class FallbackTests(unittest.TestCase):
         groups=[{'Nhóm':'Sở hữu nước ngoài','Tỷ lệ (%)':3.21},{'Nhóm':'Sở hữu khác','Tỷ lệ (%)':96.79}]
         svg=renderSVG.drawToString(ownership_drawing(rows,groups,'VIC'))
         self.assertIn('96.79%',svg)
-        self.assertNotIn('60.00%',svg)
+        self.assertIn('60.00%',svg)
 
     def test_units_periods_and_existing_zero(self):
         c={'ticker':'CMT','summary':{'epsRatio':None,'bookValue':0,'roe':None}}

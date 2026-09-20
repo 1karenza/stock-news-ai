@@ -124,9 +124,9 @@ def parse_cafef_ownership(markup, ticker):
 
 
 def ownership_chart_rows(rows):
-    """Never silently normalize overlapping/stale disclosures into 100%."""
+    """CafeF outer ring: holdings >=1%, plus remainder only below 100%."""
     selected = [r for r in rows if r['Tỷ lệ (%)'] >= 1]
-    if not selected or sum(r["Tỷ lệ (%)"] for r in selected) > 100.05:
+    if not selected:
         return []
     result = [{"Cổ đông":r["Cổ đông"],"Tỷ lệ (%)":r["Tỷ lệ (%)"]}
               for r in sorted(selected,key=lambda r:r["Tỷ lệ (%)"],reverse=True)]

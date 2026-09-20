@@ -103,16 +103,13 @@ def news_table(rows):
     """Natural row heights; summary gets most of the available width."""
     cells = []
     for index, row in enumerate(rows, start=1):
-        url = row["Đọc tin gốc"]
         esc = lambda key: html.escape(str(row[key]))
         title = html.escape(str(row.get('Tiêu đề bài báo', '')))
-        if urlparse(url).scheme in ('http', 'https'):
-            title = f'<a class="source-link" href="{html.escape(url, quote=True)}" target="_blank" rel="noopener noreferrer">{title} ↗</a>'
-        cells.append(f'<tr><td data-label="Ngày / Mã"><strong>{esc("Mã CK")}</strong><br>{esc("Ngày")}</td>'
+        cells.append(f'<tr><td data-label="Ngày / Mã" class="news-date"><strong>{esc("Mã CK")}</strong><br><span>{esc("Ngày")}</span></td>'
                      f'<td data-label="Tiêu đề bài báo">{title}<br><span class="small-muted">{esc("Loại tin")}</span></td>'
                      f'<td data-label="Tóm tắt"><a class="summary-jump" href="#news-detail-{index}" target="_self" title="Xem tóm tắt" aria-label="Xem tóm tắt tin {index}">↓</a></td></tr>')
     return ('<div class="news-table-wrap"><table class="news-table"><caption>Bảng tổng hợp tin chứng khoán</caption>'
-            '<colgroup><col style="width:13%"><col style="width:77%"><col style="width:10%"></colgroup>'
+            '<colgroup><col style="width:155px"><col><col style="width:85px"></colgroup>'
             '<thead><tr><th scope="col">Ngày / Mã</th><th scope="col">Tiêu đề bài báo / Loại tin</th>'
             '<th scope="col">Tóm tắt</th></tr></thead>'
             '<tbody>' + ''.join(cells) + '</tbody></table></div>')

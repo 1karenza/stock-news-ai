@@ -126,7 +126,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     else:
         story.append(p('Cơ cấu sở hữu - CafeF',sub))
         story.append(p('Chưa đủ dữ liệu để vẽ biểu đồ tròn hoặc tổng tỷ lệ công bố vượt 100%.'))
-    story.append(p('Nguồn CafeF. Vòng ngoài: cổ đông sở hữu từ 1% và phần còn lại. Vòng trong: nước ngoài, nhà nước, khác; hai cách phân loại độc lập. Ngày công bố có thể khác nhau.'))
+    story.append(p('Nguồn CafeF. Vòng ngoài: cổ đông từ 1% và phần còn lại; vòng trong: phân loại sở hữu. Nhãn giữ tỷ lệ gốc; kích thước lát chia theo tổng dữ liệu như CafeF. Công bố có thể khác ngày, chồng lặp và cộng vượt 100%.'))
     section(f'IV / Định giá - {bundle["ticker"]}')
     story.append(p('Tối đa 10 mã đối chiếu cùng nhóm ngành ngoài mã đang tra, ưu tiên vốn hóa lớn trong danh sách nguồn trả về. P/E: TTM; P/B: quý gần nhất.'))
     cols=['Mã','Doanh nghiệp','P/E (TTM)','P/B (FQ)','Vốn hóa (tỷ đồng)','Nguồn cập nhật']

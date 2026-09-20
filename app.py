@@ -643,7 +643,11 @@ with tab_news:
           const target = document.getElementById(link.getAttribute('href').slice(1));
           if (!target) return;
           event.preventDefault(); event.stopImmediatePropagation();
-          target.scrollIntoView({block:'start', behavior:'instant'});
+          const index = link.getAttribute('href').replace('#news-detail-', '');
+          const card = document.querySelector('.st-key-news-card-' + index);
+          const details = card && card.querySelector('details');
+          if (details && !details.open) details.querySelector('summary').click();
+          requestAnimationFrame(() => target.scrollIntoView({block:'start', behavior:'instant'}));
         };
         document.addEventListener('click', window.stockNewsJump, true);
         </script>''', unsafe_allow_javascript=True)
@@ -667,7 +671,7 @@ with tab_news:
             bullets, quick = fallback_detailed_summary(item, item.get("article_text", ""))
 
             st.markdown(f'<div id="news-detail-{i}" class="news-detail-anchor"></div>', unsafe_allow_html=True)
-            with st.expander(f"{i}. [{tickers_text}] {item['title']}", expanded=True):
+            with st.expander(f"{i}. [{tickers_text}] {item['title']}", expanded=False, key=f"news-card-{i}"):
                 article_controls(item, profile)
                 top1, top2, top3, top4 = st.columns([1, 1, 1, 1.25])
                 top1.write(f"**📅 Ngày:** {item['published']}")

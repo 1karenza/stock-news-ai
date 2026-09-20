@@ -13,6 +13,7 @@ from ownership_chart import ownership_drawing
 from reportlab.graphics import renderSVG
 import html
 from urllib.parse import urlparse
+from source_tables import source_table, source_link
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -47,11 +48,16 @@ def load_equity(ticker, period):
     return bundle
 
 
-def data_table(rows):
+def data_table(rows, show_sources=True):
     if not rows:
         st.info("Nguồn chưa cung cấp dữ liệu cho mục này.")
         return
+    if show_sources and any('Nguồn' in r or 'Nguồn bổ sung' in r for r in rows):
+        st.markdown(source_table(rows), unsafe_allow_html=True)
+        return
     frame = pd.DataFrame(rows).drop(columns=['Chỉ số bổ sung'], errors='ignore')
+    if not show_sources:
+        frame = frame.drop(columns=['Nguồn','Nguồn bổ sung'], errors='ignore')
     frame = frame.rename(columns={'EPS (TTM, đ/CP)':'EPS (đ/CP; xem kỳ bổ sung)'})
     if 'Số cổ phiếu' in frame:
         frame['Số cổ phiếu'] = frame['Số cổ phiếu'].map(lambda x: f'{x:,.0f}' if pd.notna(x) else '—')
@@ -73,7 +79,6 @@ def provenance(bundle):
     c = bundle["company"]
     if c:
         st.caption(f'Simplize · Ngày cập nhật trang: {c["summary"].get("analysisUpdated", "Chưa rõ")} · Tải lúc {c["fetched"]}. Chỉ số có thể khác kỳ cập nhật; không phải báo giá trực tiếp.')
-        st.markdown(f'<a class="source-link" target="_blank" rel="noopener noreferrer" href="{html.escape(c["source_url"], quote=True)}">Simplize ↗</a>', unsafe_allow_html=True)
 
 
 def render_equity_prices(bundle):
@@ -96,12 +101,14 @@ def render_equity_prices(bundle):
     chart_rows = ownership_chart_rows(ownership)
     if chart_rows or bundle.get('ownership_groups'):
         drawing = ownership_drawing(ownership, bundle.get('ownership_groups',[]), ticker)
-        svg = renderSVG.drawToString(drawing)
+        svg = renderSVG.drawToString(drawing).replace('font-family: ReportVN;', 'font-family: Arial, sans-serif;')
         st.image(svg, width='stretch')
     elif ownership:
         st.info("Các công bố có thể khác ngày hoặc chồng lặp; tổng tỷ lệ vượt 100% nên chỉ hiển thị bảng gốc.")
-    data_table(ownership)
-    st.caption("Nguồn CafeF · Vòng ngoài: cổ đông sở hữu từ 1% và phần còn lại; vòng trong: sở hữu nước ngoài, nhà nước và khác. Hai vòng là hai cách phân loại riêng, không cộng chung. Khi danh sách chồng lặp, chỉ vẽ phân loại sở hữu hợp lệ. Ngày công bố từng cổ đông có thể khác nhau.")
+    data_table(ownership, show_sources=False)
+    if ownership:
+        st.markdown('Mở nguồn: ' + source_link(ownership[0].get('Nguồn','')), unsafe_allow_html=True)
+    st.caption("Nguồn CafeF · Vòng ngoài: cổ đông từ 1% và phần còn lại; vòng trong: phân loại sở hữu. Nhãn giữ tỷ lệ gốc; kích thước lát chia theo tổng dữ liệu như CafeF. Danh sách có thể khác ngày, chồng lặp và cộng vượt 100%. Các cổ đông nhỏ xem ở bảng bên dưới.")
     provenance(bundle)
 
 
@@ -144,7 +151,12 @@ def render_equity_valuation(bundle):
     st.markdown("#### So sánh doanh nghiệp cùng ngành")
     st.caption("Tối đa 10 mã đối chiếu ngoài mã đang tra, ưu tiên vốn hóa lớn trong danh sách ngành nguồn trả về; xác minh cùng mã nhóm ngành và xếp theo vốn hóa. Ngành ít mã có thể không đủ 10; đây không phải xếp hạng chất lượng đầu tư.")
     data_table(peers)
-    st.caption('EPS, BVPS và ROE còn thiếu được bổ sung từ CafeF khi có dữ liệu. Xem cột Kỳ số liệu bổ sung; số liệu cũ không dùng để tính giá tham chiếu tương đối. Ô trống là nguồn chưa cung cấp, không thay bằng số 0.')
+    st.caption('EPS, BVPS và ROE còn thiếu được bổ sung từ CafeF khi có dữ liệu. Số liệu cũ không dùng để tính giá tham chiếu tương đối. Ô trống là nguồn chưa cung cấp, không thay bằng số 0.')
+    notes = [r for r in peers if r.get('Kỳ số liệu bổ sung')]
+    if notes:
+        with st.expander('Kỳ cập nhật các chỉ số bổ sung', expanded=False):
+            for row in notes:
+                st.caption(f"{row['Mã']} · {row['Kỳ số liệu bổ sung']}")
     chart_rows = [{"Mã":r["Mã"],"Chỉ số":k,"Giá trị":r[k]} for r in peers for k in ("P/E (TTM)","P/B (FQ)") if r[k] is not None and r[k]>0]
     if chart_rows:
         st.altair_chart(alt.Chart(pd.DataFrame(chart_rows)).mark_bar().encode(x="Mã:N", y="Giá trị:Q",color=alt.Color("Chỉ số:N",scale=alt.Scale(range=["#88465f","#e4a4bd"])),column="Chỉ số:N",tooltip=["Mã:N","Chỉ số:N","Giá trị:Q"]),width="stretch")
