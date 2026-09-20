@@ -19,6 +19,13 @@ def source_link(url):
 def source_table(rows):
     hidden = {'Nguồn','Nguồn bổ sung','Chỉ số bổ sung','Kỳ số liệu bổ sung'}
     columns = [key for key in rows[0] if key not in hidden]
+    valuation = 'P/E (TTM)' in columns
+    widths = {'Mã':80, 'Doanh nghiệp':220, 'Ngành':150,
+              'Giá tham chiếu nguồn (đ/CP)':115, 'P/E (TTM)':85, 'P/B (FQ)':85,
+              'Vốn hóa (tỷ đồng)':110, 'EPS (TTM, đ/CP)':100, 'BVPS (đ/CP)':100,
+              'ROE (%)':85, 'Nguồn cập nhật':110}
+    colgroup = ('<colgroup>'+''.join(f'<col style="width:{widths.get(k,100)}px">' for k in columns)
+                +'<col style="width:125px"></colgroup>') if valuation else ''
     labels = {'EPS (TTM, đ/CP)':'EPS (đ/CP)'}
     header = ''.join(f'<th>{html.escape(labels.get(k,k))}</th>' for k in columns) + '<th>Mở nguồn</th>'
     body = []
@@ -32,4 +39,5 @@ def source_table(rows):
         urls = dict.fromkeys(safe_url(row.get(k,'')) for k in ('Nguồn','Nguồn bổ sung'))
         links = '<br>'.join(source_link(u) for u in urls if u)
         body.append('<tr>'+''.join(cells)+f'<td class="source-cell">{links or "—"}</td></tr>')
-    return '<div class="source-table-wrap"><table class="source-table"><thead><tr>'+header+'</tr></thead><tbody>'+''.join(body)+'</tbody></table></div>'
+    table_class = 'source-table valuation-table' if valuation else 'source-table'
+    return '<div class="source-table-wrap"><table class="'+table_class+'">'+colgroup+'<thead><tr>'+header+'</tr></thead><tbody>'+''.join(body)+'</tbody></table></div>'

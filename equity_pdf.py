@@ -101,7 +101,7 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
         d.add(String(68,10,frame.date.min().strftime('%d/%m/%Y'),fontName=FONT,fontSize=8))
         d.add(String(width-85,10,frame.date.max().strftime('%d/%m/%Y'),fontName=FONT,fontSize=8))
         story.append(d)
-    section(f'I / Tin chứng khoán - {bundle["ticker"]}')
+    section('I / Tin chứng khoán')
     now=datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).strftime('%d/%m/%Y %H:%M UTC+7')
     story.append(p(f'Xuất lúc {now}. Tin đã quét: {", ".join(searched_tickers)}. Mục II-IV: {bundle["ticker"]}.'))
     story.append(p('Nguồn: Google News / báo gốc (tin), Simplize (lịch và định giá), Yahoo Finance (giá), CafeF (cổ đông). Dữ liệu có thể trễ hoặc thiếu.'))

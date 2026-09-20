@@ -106,8 +106,6 @@ def render_equity_prices(bundle):
     elif ownership:
         st.info("Các công bố có thể khác ngày hoặc chồng lặp; tổng tỷ lệ vượt 100% nên chỉ hiển thị bảng gốc.")
     data_table(ownership, show_sources=False)
-    if ownership:
-        st.markdown('Mở nguồn: ' + source_link(ownership[0].get('Nguồn','')), unsafe_allow_html=True)
     st.caption("Nguồn CafeF · Vòng ngoài: cổ đông từ 1% và phần còn lại; vòng trong: phân loại sở hữu. Nhãn giữ tỷ lệ gốc; kích thước lát chia theo tổng dữ liệu như CafeF. Danh sách có thể khác ngày, chồng lặp và cộng vượt 100%. Các cổ đông nhỏ xem ở bảng bên dưới.")
     provenance(bundle)
 

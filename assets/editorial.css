@@ -88,6 +88,10 @@ a { color: var(--rose-ink) !important; text-underline-offset: 4px; }
 .source-table th, .source-table td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; min-width:95px; }
 .source-table th { background:var(--soft); white-space:nowrap; position:sticky; top:0; z-index:1; }
 .source-table td.source-cell { white-space:nowrap; }
+.source-table.valuation-table { table-layout:fixed; min-width:1365px; }
+.source-table.valuation-table th, .source-table.valuation-table td { min-width:0; padding:12px 10px; white-space:normal; overflow-wrap:break-word; }
+.source-table.valuation-table th:first-child, .source-table.valuation-table td:first-child { white-space:nowrap; padding-left:14px; }
+.source-table.valuation-table td:nth-child(n+4):nth-child(-n+10) { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .sidebar-footer { border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 2rem; color: var(--muted); font-size: 12px; }
 [data-testid="stWidgetLabel"] p { font-size: 14px; font-weight: 600; color: var(--ink); }
 [data-testid="stTextInputRootElement"], [data-testid="stNumberInputContainer"],
