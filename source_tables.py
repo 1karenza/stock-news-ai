@@ -37,7 +37,10 @@ def source_table(rows):
             elif isinstance(value, float): value=f'{value:,.2f}'
             cells.append(f'<td>{html.escape(str(value))}</td>')
         urls = dict.fromkeys(safe_url(row.get(k,'')) for k in ('Nguồn','Nguồn bổ sung'))
+        if valuation:
+            urls = [u for u in urls if not ((urlparse(u).hostname or '').lower() == 'cafef.vn'
+                    or (urlparse(u).hostname or '').lower().endswith('.cafef.vn'))]
         links = '<br>'.join(source_link(u) for u in urls if u)
         body.append('<tr>'+''.join(cells)+f'<td class="source-cell">{links or "—"}</td></tr>')
-    table_class = 'source-table valuation-table' if valuation else 'source-table'
+    table_class = 'source-table valuation-table' if valuation else ('source-table calendar-table' if 'Ngày' in columns else 'source-table')
     return '<div class="source-table-wrap"><table class="'+table_class+'">'+colgroup+'<thead><tr>'+header+'</tr></thead><tbody>'+''.join(body)+'</tbody></table></div>'

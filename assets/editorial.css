@@ -88,6 +88,7 @@ a { color: var(--rose-ink) !important; text-underline-offset: 4px; }
 .source-table th, .source-table td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; min-width:95px; }
 .source-table th { background:var(--soft); white-space:nowrap; position:sticky; top:0; z-index:1; }
 .source-table td.source-cell { white-space:nowrap; }
+.source-table.calendar-table th:first-child, .source-table.calendar-table td:first-child { min-width:125px; width:125px; white-space:nowrap; overflow-wrap:normal; }
 .source-table.valuation-table { table-layout:fixed; min-width:1365px; }
 .source-table.valuation-table th, .source-table.valuation-table td { min-width:0; padding:12px 10px; white-space:normal; overflow-wrap:break-word; }
 .source-table.valuation-table th:first-child, .source-table.valuation-table td:first-child { white-space:nowrap; padding-left:14px; }
