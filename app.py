@@ -12,6 +12,7 @@ import streamlit as st
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from news_content import summary_sentences, news_table
+from news_cache import process_cached
 from news_fetch import ArticleUnavailable, read_source_article
 from investor_profile import (get_profile, persist_profile, watchlist_selector, workspace_view,
                               article_controls, article_id, mark_seen, changed)
@@ -135,9 +136,15 @@ def fetch_google_news(ticker: str, days: int = 7, max_items: int = 20):
     return rows
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_article_text(url: str, title: str = "", content_version="investor-v1") -> str:
+    # Exceptions are not cached: a failed request must be retried next time.
+    return read_source_article(url, title)
+
+
 def fetch_article_text(url: str, title: str = "") -> str:
     try:
-        return read_source_article(url, title)
+        return cached_article_text(url, title)
     except ArticleUnavailable:
         return ""
 
@@ -568,7 +575,8 @@ with tab_news:
 
         for i, item in enumerate(merged):
             status.write(f"Đang đọc bài {i+1}/{len(merged)}: {item['title'][:80]}...")
-            processed.append(process_article(item, use_ai, model))
+            processed.append(process_cached(item, use_ai, model,
+                             st.session_state.setdefault('processed_news_cache', {}), process_article))
             progress.progress((i + 1) / max(1, len(merged)))
 
         status.empty()
