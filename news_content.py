@@ -29,9 +29,8 @@ def extract_article(document, title=""):
             pass
     for tag in soup.select("script, style, noscript, nav, aside, footer, .related-news, .related-articles"):
         tag.decompose()
-    candidates = []
-    for selector in ("#content_detail_news", ".entry-body", ".article-detail-content", ".post-detail-body .ql-editor",
-                     "[itemprop='articleBody']", ".article-editor", ".mekong-detail-body", ".article-body", ".article-content",
+    candidates = structured[:]
+    for selector in ("[itemprop='articleBody']", ".article-editor", ".mekong-detail-body", ".article-body", ".article-content",
                      ".detail-content", ".content-detail", ".fck_detail", ".entry-content",
                      ".post-content", ".detail__content", "article"):
         for node in soup.select(selector):
@@ -49,9 +48,7 @@ def extract_article(document, title=""):
         if candidates:
             break
     if candidates:
-        return max(candidates + structured, key=len)[:16000]
-    if structured:
-        return max(structured, key=len)[:16000]
+        return max(candidates, key=len)[:16000]
     # A publisher description is still useful evidence; don't collect unrelated
     # page-wide paragraphs from navigation, sign-in or consent screens.
     description = soup.select_one('meta[property="og:description"], meta[name="description"]')

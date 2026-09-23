@@ -92,9 +92,7 @@ def fetch_google_news(ticker: str, days: int = 7, max_items: int = 20):
         f"q={quote_plus(query)}&hl=vi&gl=VN&ceid=VN:vi"
     )
 
-    response = requests.get(url, timeout=(5, 15))
-    response.raise_for_status()
-    feed = feedparser.parse(response.content)
+    feed = feedparser.parse(url)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     rows, seen = [], set()
 
@@ -292,12 +290,7 @@ def merge_articles(all_news, watched_tickers):
 
 
 def process_article(item, use_ai=False, model="gpt-5.6-luna"):
-    try:
-        article_text = read_source_article(item["url"], item["title"])
-        item.pop("article_error", None)
-    except ArticleUnavailable as exc:
-        article_text = ""
-        item["article_error"] = str(exc)
+    article_text = fetch_article_text(item["url"], item["title"])
     item["article_text"] = article_text
 
     if use_ai and os.getenv("OPENAI_API_KEY", "").strip():
@@ -599,9 +592,9 @@ with tab_news:
               (view_mode == "Chưa đọc" and article_id(item) not in profile["read"]) or
               (view_mode == "Đã lưu" and article_id(item) in profile["saved"])]
 
-    missing_articles = [item for item in merged if len(item.get("article_text", "").split()) < 80]
+    missing_articles = [item for item in merged if not item.get("article_text")]
     if missing_articles:
-        st.caption(f"{len(missing_articles)} bài chưa tải được đầy đủ hoặc nguồn chỉ có nội dung ngắn. Có thể thử tải lại bên dưới.")
+        st.caption(f"{len(missing_articles)} bài chưa tải được nội dung gốc. Các bài này đang hiển thị tiêu đề/mô tả nguồn.")
         if st.button("Tải lại các bài còn thiếu  ↻", key="retry_missing_articles"):
             retry_progress = st.progress(0, text="Đang tải lại nội dung bài gốc…")
             for index, item in enumerate(missing_articles):
@@ -694,8 +687,6 @@ with tab_news:
                     st.markdown(f'<ul class="article-summary">{detail_html}</ul>', unsafe_allow_html=True)
 
                 if len(item.get("article_text", "").split()) < 80:
-                    if item.get("article_error"):
-                        st.caption("Chưa đọc được bài gốc: " + item["article_error"])
                     st.caption(
                         "Nguồn hiện cung cấp ít nội dung. Tóm tắt chỉ dựa trên thông tin đọc được; "
                         "mở bài gốc để xem đầy đủ."

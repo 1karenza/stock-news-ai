@@ -16,14 +16,6 @@ ARTICLE = (
 
 
 class NewsContentTests(unittest.TestCase):
-    def test_full_publisher_body_wins_over_short_structured_description(self):
-        for container in ('<div id="content_detail_news">', '<div class="entry-body">',
-                          '<div class="article-detail-content">', '<div class="post-detail-body"><div class="ql-editor">'):
-            with self.subTest(container=container):
-                document = ('<script type="application/ld+json">' + json.dumps({'articleBody': 'Mô tả ngắn'})
-                            + '</script>' + container + '<p>' + ARTICLE + '</p></div></div>')
-                self.assertEqual(extract_article(document), ARTICLE)
-
     def test_summary_keeps_context_facts_order_and_no_duplicates(self):
         item = {"title": "Tiêu đề", "article_text": ARTICLE}
         overview = summary_sentences(item)
