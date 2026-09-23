@@ -63,7 +63,7 @@ def extract_article(document, title=""):
 
 def summary_sentences(item, detail=False):
     title = re.sub(r"\s+-\s+[^-]+$", "", item.get("title", "")).strip()
-    source = item.get("article_text") or item.get("summary") or title
+    source = item.get("article_text") or item.get("summary") or ("" if detail else title)
     source = BeautifulSoup(source, "html.parser").get_text(" ", strip=True)
     source = re.sub(r"\s+", " ", source).strip()
     sentences = re.split(r"(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
@@ -71,12 +71,12 @@ def summary_sentences(item, detail=False):
     for sentence in sentences:
         sentence = sentence.strip()
         key = re.sub(r"\W+", "", sentence.lower())
-        if len(sentence) < 30 or key in seen:
+        if not sentence or (len(sentence) < 30 and (not detail or len(source) >= 160)) or key in seen or (detail and key == re.sub(r"\W+", "", title.lower())):
             continue
         seen.add(key)
         unique.append(sentence)
     if not unique:
-        return [title] if title else []
+        return [title] if title and not detail else []
 
     # Keep the lead for context, then favour facts, dates and explanations.
     terms = ("doanh thu", "lợi nhuận", "cổ tức", "phát hành", "kỳ hạn", "lãi suất",
