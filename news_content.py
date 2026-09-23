@@ -118,8 +118,7 @@ def summary_sentences(item, detail=False):
     return result
 
 
-def summary_paragraph(item, ai_text=None):
-    """One short paragraph, never a repeated headline presented as a summary."""
+def _summary_source(item, ai_text=None):
     title = re.sub(r"\s+-\s+[^-]+$", "", item.get("title", "")).strip()
     normalize = lambda text: re.sub(r"\W+", "", text.casefold())
     source = ai_text or item.get("article_text") or item.get("summary", "")
@@ -129,7 +128,27 @@ def summary_paragraph(item, ai_text=None):
     parts = re.split(r"\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
     parts = [part.strip() for part in parts if normalize(part) not in
              {normalize(title), normalize(item.get("title", "")), ""}]
-    source = "\n".join(parts)
+    return "\n".join(parts)
+
+
+def summary_bullets(item, ai_text=None):
+    """Four to eight evidence-based points when enough source facts exist."""
+    source = _summary_source(item, ai_text)
+    if not source or len(source.split()) < 8:
+        return []
+    points = summary_sentences({"title": "", "article_text": source}, detail=True)[:8]
+    # Old cached AI paragraphs may contain too few points. Prefer the actual
+    # article over padding the result or repeating a point to meet the minimum.
+    if ai_text and len(points) < 4:
+        original = summary_bullets(item)
+        if len(original) > len(points):
+            return original
+    return points
+
+
+def summary_paragraph(item, ai_text=None):
+    """Compact plain text for the exported table."""
+    source = _summary_source(item, ai_text)
     if not source or len(source.split()) < 8:
         return "Chưa tải được nội dung đủ để tóm tắt. Bạn có thể thử tải lại hoặc mở bài gốc."
     return " ".join(summary_sentences({"title": "", "article_text": source}))

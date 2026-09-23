@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from news_content import extract_article, news_table, summary_paragraph, summary_sentences
+from news_content import extract_article, news_table, summary_bullets, summary_paragraph, summary_sentences
 
 
 ARTICLE = (
@@ -16,6 +16,24 @@ ARTICLE = (
 
 
 class NewsContentTests(unittest.TestCase):
+    def test_bullets_keep_four_to_eight_distinct_facts(self):
+        points = summary_bullets({"title": "Tiêu đề", "article_text": ARTICLE})
+        self.assertGreaterEqual(len(points), 4)
+        self.assertLessEqual(len(points), 8)
+        self.assertEqual(len(points), len(set(points)))
+        self.assertIn("171 triệu", " ".join(points))
+        many = " ".join(f"Doanh nghiệp số {i} ghi nhận doanh thu {i * 100} tỷ đồng trong kỳ báo cáo." for i in range(15))
+        self.assertEqual(len(summary_bullets({"article_text": many})), 8)
+
+    def test_bullets_do_not_pad_sparse_source(self):
+        self.assertEqual(summary_bullets({"title": "Chỉ có tiêu đề"}), [])
+        point = "Doanh nghiệp dự kiến phát hành 171 triệu cổ phiếu từ lợi nhuận chưa phân phối."
+        self.assertEqual(summary_bullets({"article_text": point}), [point])
+
+    def test_old_ai_paragraph_uses_article_to_supply_four_points(self):
+        points = summary_bullets({"article_text": ARTICLE}, ai_text="Doanh nghiệp công bố kế hoạch phát hành cổ phiếu thưởng cho cổ đông hiện hữu.")
+        self.assertGreaterEqual(len(points), 4)
+
     def test_detail_is_longer_and_retains_conditions_without_inventing_facts(self):
         sentences = [
             f"Mảng hoạt động số {i} ghi nhận doanh thu {i * 100} tỷ đồng trong quý này, "

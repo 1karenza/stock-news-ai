@@ -28,8 +28,8 @@ Riêng mục II chỉ xuất sự kiện thuộc **Tháng có sự kiện** đan
 
 ## Nguồn và giới hạn
 
-- Tóm tắt thông tin hiển thị thành một đoạn ngắn, tối đa 4 câu / khoảng 140 từ,
-  ưu tiên sự kiện và số liệu chính. AI cũng dùng cùng định dạng, không chia mục.
+- Tóm tắt thông tin hiển thị 4–8 gạch đầu dòng, ưu tiên sự kiện và số liệu chính.
+  AI cũng dùng cùng định dạng. Nguồn không đủ 4 ý sẽ có thông báo, không thêm ý giả.
 - Tiêu đề không được dùng thay cho tóm tắt. Bài tải rỗng hoặc quá ngắn không
   lưu vào cache xử lý, để lần quét sau có thể thử lại. Nguồn chặn truy cập,
   video hoặc trang chỉ có mô tả vẫn có thể chưa đủ nội dung để tóm tắt.

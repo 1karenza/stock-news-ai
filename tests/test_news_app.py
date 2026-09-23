@@ -61,9 +61,10 @@ class NewsAppTests(unittest.TestCase):
             self.assertEqual(app.session_state["merged_news"][0]["article_text"], ARTICLE)
             self.assertNotIn("retry_missing_articles", [button.key for button in app.button])
             self.assertTrue(any("171 triệu" in element.value for element in app.markdown))
-            paragraphs = [element.value for element in app.markdown if 'class="article-summary-text"' in element.value]
+            paragraphs = [element.value for element in app.markdown if 'class="article-summary"' in element.value]
             self.assertEqual(len(paragraphs), 1)
-            self.assertNotIn('<li>', paragraphs[0])
+            self.assertGreaterEqual(paragraphs[0].count('<li>'), 4)
+            self.assertLessEqual(paragraphs[0].count('<li>'), 8)
             self.assertNotIn('\n', paragraphs[0])
             self.assertFalse(any('Góc nhìn nhanh:' in element.value for element in app.markdown))
 
