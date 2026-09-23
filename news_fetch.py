@@ -6,13 +6,59 @@ import feedparser
 from bs4 import BeautifulSoup
 
 import requests
-from googlenewsdecoder import gnewsdecoder
+from news_transport import gnewsdecoder
 
 from news_content import extract_article
 
 
 class ArticleUnavailable(Exception):
     """Temporary retrieval failure, safe to retry on the next request."""
+
+
+# Publisher indexes are independent of ticker and Google's redirect service.
+# Only exact headline matches on the expected publisher are accepted.
+PUBLISHER_INDEXES = {
+    'moneyf': ['https://moneyf.vn/'],
+    'chứng khoán dnse': ['https://www.dnse.com.vn/'],
+    'kinhtechungkhoan.vn': ['https://kinhtechungkhoan.vn/chung-khoan', 'https://kinhtechungkhoan.vn/bao-cao-phan-tich'],
+    'cafef': ['https://cafef.vn/'],
+    'vnexpress': ['https://vnexpress.net/kinh-doanh'],
+    'vnexpress.net': ['https://vnexpress.net/kinh-doanh'],
+    'vietstock': ['https://vietstock.vn/'],
+    'nguoiquansat.vn': ['https://nguoiquansat.vn/'],
+    'báo dân trí': ['https://dantri.com.vn/'],
+    'dantri.com.vn': ['https://dantri.com.vn/'],
+    'báo dân việt': ['https://danviet.vn/'],
+    'danviet.vn': ['https://danviet.vn/'],
+    'baodautu.vn': ['https://baodautu.vn/'],
+    'mekong asean': ['https://mekongasean.vn/'],
+    'tin nhanh chứng khoán': ['https://www.tinnhanhchungkhoan.vn/'],
+}
+
+
+def publisher_index_url(title):
+    headline, separator, publisher = title.rpartition(' - ')
+    if not separator:
+        return None
+    def norm(value):
+        return re.sub(r'\W+', '', unicodedata.normalize('NFC', value).casefold())
+    expected = norm(headline)
+    for index in PUBLISHER_INDEXES.get(publisher.casefold(), []):
+        try:
+            response = requests.get(index, timeout=(5, 15))
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, 'html.parser')
+            host = urlparse(index).hostname.removeprefix('www.')
+            for anchor in soup.select('a[href]'):
+                if expected not in {norm(anchor.get_text(' ', strip=True)), norm(anchor.get('title', ''))}:
+                    continue
+                link = urljoin(index, anchor['href'])
+                parsed = urlparse(link)
+                if parsed.scheme in ('https', 'http') and (parsed.hostname or '').removeprefix('www.') == host:
+                    return link
+        except requests.RequestException:
+            continue
+    return None
 
 
 def publisher_feed_url(title):
@@ -65,12 +111,16 @@ def resolve_source_url(url):
                 and urlparse(decoded).hostname != "news.google.com"):
             return decoded
     except Exception as exc:
+        if isinstance(exc, requests.HTTPError) and exc.response is not None and exc.response.status_code == 429:
+            raise ArticleUnavailable("Google News đang giới hạn lượt truy cập (429). Vui lòng thử lại sau.") from exc
         raise ArticleUnavailable("Chưa mở được đường dẫn Google News.") from exc
     raise ArticleUnavailable("Chưa mở được đường dẫn Google News.")
 
 
 def read_source_article(url, title=""):
     publisher_url = (publisher_feed_url(title) if urlparse(url).hostname == 'news.google.com' else None)
+    if not publisher_url and urlparse(url).hostname == 'news.google.com':
+        publisher_url = publisher_index_url(title)
     publisher_url = publisher_url or resolve_source_url(url)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36"}
     for attempt in range(2):

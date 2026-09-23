@@ -92,7 +92,9 @@ def fetch_google_news(ticker: str, days: int = 7, max_items: int = 20):
         f"q={quote_plus(query)}&hl=vi&gl=VN&ceid=VN:vi"
     )
 
-    feed = feedparser.parse(url)
+    response = requests.get(url, timeout=(5, 15))
+    response.raise_for_status()
+    feed = feedparser.parse(response.content)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     rows, seen = [], set()
 
