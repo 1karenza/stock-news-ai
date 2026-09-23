@@ -71,7 +71,7 @@ def summary_sentences(item, detail=False):
     for sentence in sentences:
         sentence = sentence.strip()
         key = re.sub(r"\W+", "", sentence.lower())
-        if not sentence or (len(sentence) < 30 and (not detail or len(source) >= 160)) or key in seen or (detail and key == re.sub(r"\W+", "", title.lower())):
+        if not sentence or (len(sentence) < 30 and (not detail or len(source) >= 160)) or key in seen or (detail and key in {re.sub(r"\W+", "", title.lower()), re.sub(r"\W+", "", item.get("title", "").lower())}):
             continue
         seen.add(key)
         unique.append(sentence)
