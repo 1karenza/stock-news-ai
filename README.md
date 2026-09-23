@@ -28,6 +28,11 @@ Riêng mục II chỉ xuất sự kiện thuộc **Tháng có sự kiện** đan
 
 ## Nguồn và giới hạn
 
+- Tóm tắt thông tin hiển thị thành một đoạn ngắn, tối đa 4 câu / khoảng 140 từ,
+  ưu tiên sự kiện và số liệu chính. AI cũng dùng cùng định dạng, không chia mục.
+- Tiêu đề không được dùng thay cho tóm tắt. Bài tải rỗng hoặc quá ngắn không
+  lưu vào cache xử lý, để lần quét sau có thể thử lại. Nguồn chặn truy cập,
+  video hoặc trang chỉ có mô tả vẫn có thể chưa đủ nội dung để tóm tắt.
 - Google News RSS và bài gốc cho tin tức; nếu bài gốc không đọc được, app chỉ
   sử dụng nội dung nguồn có sẵn, không tự tạo chi tiết.
 - CafeF cho danh sách cổ đông, số cổ phiếu, tỷ lệ và ngày cập nhật từng công bố.

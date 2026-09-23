@@ -26,7 +26,7 @@ class FallbackTests(unittest.TestCase):
 
     def test_news_reuses_processing_but_updates_membership_and_expires(self):
         cache={}
-        processor=Mock(side_effect=lambda item,*_:dict(item,article_text='content'))
+        processor=Mock(side_effect=lambda item,*_:dict(item,article_text='content ' * 90))
         item={'url':'https://example.com/1','title':'News','summary':'Text','tickers':{'FPT'}}
         process_cached(item,False,'model',cache,processor,now=0)
         result=process_cached(dict(item,tickers={'FPT','CMG'}),False,'model',cache,processor,now=60)
@@ -34,3 +34,12 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result['tickers'],{'FPT','CMG'})
         process_cached(item,False,'model',cache,processor,now=901)
         self.assertEqual(processor.call_count,2)
+
+    def test_short_article_is_retried_instead_of_cached(self):
+        cache = {}
+        processor = Mock(side_effect=lambda item,*_:dict(item,article_text='Only a short teaser'))
+        item = {'url':'https://example.com/short','title':'News','summary':'Text'}
+        process_cached(item,False,'model',cache,processor,now=0)
+        process_cached(item,False,'model',cache,processor,now=60)
+        self.assertEqual(processor.call_count,2)
+        self.assertEqual(cache,{})

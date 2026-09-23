@@ -33,25 +33,29 @@ def extract_article(document, title=""):
     for selector in ("#content_detail_news", ".entry-body", ".article-detail-content", ".post-detail-body .ql-editor",
                      "[itemprop='articleBody']", ".article-editor", ".mekong-detail-body", ".article-body", ".article-content",
                      ".detail-content", ".content-detail", ".fck_detail", ".entry-content",
-                     ".post-content", ".detail__content", "article"):
+                     ".post-content", ".detail__content", ".news-content", "article"):
+        if selector == "article" and candidates:
+            continue
         for node in soup.select(selector):
-            paras = [p.get_text(" ", strip=True) for p in node.select("p")]
+            # Keep facts in lists/tables as well as prose, without copying nested
+            # paragraphs twice (a common publisher layout).
+            blocks = node.select("p, li, tr, div.paragraph")
+            paras = [p.get_text(" ", strip=True) for p in blocks
+                     if not any(parent in blocks for parent in p.parents)]
             if selector == "article" and title:
                 terms = set(re.findall(r"\w{3,}", re.sub(r"\s+-\s+[^-]+$", "", title).lower()))
                 words = set(re.findall(r"\w{3,}", node.get_text(" ", strip=True).lower()))
                 if (len(paras) < 3 and len(soup.select("article")) > 1) or len(terms & words) < max(2, len(terms)*.35):
                     continue
-            text = "\n".join(p for p in paras if len(p) > 35)
+            text = "\n".join(p for p in paras if len(p) > 15)
             if not text:
                 text = node.get_text(" ", strip=True)
             if len(text) >= 180:
                 candidates.append(text)
-        if candidates:
-            break
     if candidates:
-        return max(candidates + structured, key=len)[:16000]
+        return max(candidates + structured, key=len)[:24000]
     if structured:
-        return max(structured, key=len)[:16000]
+        return max(structured, key=len)[:24000]
     # A publisher description is still useful evidence; don't collect unrelated
     # page-wide paragraphs from navigation, sign-in or consent screens.
     description = soup.select_one('meta[property="og:description"], meta[name="description"]')
@@ -68,8 +72,8 @@ def summary_sentences(item, detail=False):
     title = re.sub(r"\s+-\s+[^-]+$", "", item.get("title", "")).strip()
     source = item.get("article_text") or item.get("summary") or title
     source = BeautifulSoup(source, "html.parser").get_text(" ", strip=True)
-    source = re.sub(r"\s+", " ", source).strip()
-    sentences = re.split(r"(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
+    source = re.sub(r"[^\S\n]+", " ", source).strip()
+    sentences = re.split(r"\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
     unique, seen = [], set()
     for sentence in sentences:
         sentence = sentence.strip()
@@ -86,7 +90,19 @@ def summary_sentences(item, detail=False):
              "mục đích", "dự kiến", "so với", "do", "nhằm", "rủi ro", "ngày")
     ranked = sorted(range(1, len(unique)), key=lambda i: (
         -(2 * bool(re.search(r"\d", unique[i])) + sum(t in unique[i].lower() for t in terms)), i))
-    limit, budget = (6, 220) if detail else (4, 140)
+    limit, budget = ((16, 550) if len(source.split()) > 900 else (12, 400)) if detail else (4, 140)
+    if detail:
+        # Reserve coverage for context, plans and qualifications before filling
+        # the remaining space with numeric facts. Output stays in source order.
+        coverage = []
+        for cues in (("do ", "nhờ", "nguyên nhân", "bối cảnh"),
+                     ("dự kiến", "kế hoạch", "ngày", "thời hạn"),
+                     ("rủi ro", "phụ thuộc", "tuy nhiên", "giả định", "chưa")):
+            match = next((i for i in range(1, len(unique))
+                          if any(cue in unique[i].lower() for cue in cues)), None)
+            if match is not None:
+                coverage.append(match)
+        ranked = list(dict.fromkeys(coverage + ranked))
     selected, words = [0], len(unique[0].split())
     for i in ranked:
         count = len(unique[i].split())
@@ -100,6 +116,23 @@ def summary_sentences(item, detail=False):
     if len(result[0].split()) > budget:
         result[0] = " ".join(result[0].split()[:budget]) + "…"
     return result
+
+
+def summary_paragraph(item, ai_text=None):
+    """One short paragraph, never a repeated headline presented as a summary."""
+    title = re.sub(r"\s+-\s+[^-]+$", "", item.get("title", "")).strip()
+    normalize = lambda text: re.sub(r"\W+", "", text.casefold())
+    source = ai_text or item.get("article_text") or item.get("summary", "")
+    source = BeautifulSoup(source, "html.parser").get_text(" ", strip=True)
+    source = re.sub(r"(?m)^\s*(?:#{1,6}\s+|[-*•]\s+|\d+[.)]\s+)", "", source)
+    source = source.replace("**", "")
+    parts = re.split(r"\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
+    parts = [part.strip() for part in parts if normalize(part) not in
+             {normalize(title), normalize(item.get("title", "")), ""}]
+    source = "\n".join(parts)
+    if not source or len(source.split()) < 8:
+        return "Chưa tải được nội dung đủ để tóm tắt. Bạn có thể thử tải lại hoặc mở bài gốc."
+    return " ".join(summary_sentences({"title": "", "article_text": source}))
 
 
 def news_table(rows):

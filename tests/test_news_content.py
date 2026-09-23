@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from news_content import extract_article, news_table, summary_sentences
+from news_content import extract_article, news_table, summary_paragraph, summary_sentences
 
 
 ARTICLE = (
@@ -16,6 +16,55 @@ ARTICLE = (
 
 
 class NewsContentTests(unittest.TestCase):
+    def test_detail_is_longer_and_retains_conditions_without_inventing_facts(self):
+        sentences = [
+            f"Mảng hoạt động số {i} ghi nhận doanh thu {i * 100} tỷ đồng trong quý này, "
+            "tăng so với cùng kỳ nhờ đơn hàng mới từ khách hàng hiện hữu và tiến độ bàn giao tốt hơn."
+            for i in range(1, 10)
+        ] + ["Tuy nhiên, kế hoạch còn phụ thuộc vào phê duyệt của cơ quan quản lý và tiến độ giải ngân trong quý tiếp theo."]
+        item = {"title": "Kết quả kinh doanh", "article_text": " ".join(sentences)}
+        detail = summary_sentences(item, detail=True)
+        self.assertGreater(len(" ".join(detail).split()), 250)
+        self.assertLessEqual(len(" ".join(detail).split()), 400)
+        self.assertGreater(len(detail), len(summary_sentences(item)))
+        self.assertIn(sentences[-1], detail)
+        self.assertTrue(all(sentence in sentences for sentence in detail))
+
+    def test_paragraph_is_short_single_block_and_keeps_numbers(self):
+        item = {"title": "Tiêu đề", "article_text": ARTICLE}
+        paragraph = summary_paragraph(item)
+        self.assertNotIn("\n", paragraph)
+        self.assertLessEqual(len(paragraph.split()), 140)
+        self.assertIn("171 triệu", paragraph)
+        self.assertNotIn("**", paragraph)
+
+    def test_title_only_rss_is_not_presented_as_summary(self):
+        title = "FPT phát hành cổ phiếu thưởng cho cổ đông hiện hữu"
+        for text in (title, title + " - Nguồn báo", "<a>" + title + "</a> - Nguồn báo"):
+            item = {"title": title + " - Nguồn báo", "summary": text}
+            self.assertIn("Chưa tải được nội dung", summary_paragraph(item))
+
+    def test_ai_multiline_text_is_presented_as_one_paragraph(self):
+        result = summary_paragraph({"title": "Tiêu đề"}, ai_text="- " + ARTICLE.replace(". ", ".\n- "))
+        self.assertNotIn("\n", result)
+        self.assertNotIn("- ", result)
+        self.assertLessEqual(len(result.split()), 140)
+
+    def test_div_paragraphs_are_not_lost_when_teaser_uses_p(self):
+        document = ('<div class="article-detail-content"><p>Mô tả ngắn của bài báo về phát hành cổ phiếu.</p>'
+                    '<div class="news-content"><div class="paragraph">' + ARTICLE + '</div></div></div>')
+        self.assertIn(ARTICLE, extract_article(document))
+
+    def test_lists_tables_and_more_complete_body_are_preserved(self):
+        document = ('<div class="entry-body"><p>' + ARTICLE[:200] + '</p></div>'
+                    '<div class="article-body"><p>' + ARTICLE + '</p>'
+                    '<ul><li><p>Ngày thực hiện dự kiến: 30/09/2026.</p></li></ul>'
+                    '<table><tr><th>Lợi nhuận sau thuế</th><td>1.250 tỷ đồng</td></tr></table></div>')
+        result = extract_article(document)
+        self.assertIn(ARTICLE, result)
+        self.assertEqual(result.count('Ngày thực hiện dự kiến'), 1)
+        self.assertIn('Lợi nhuận sau thuế 1.250 tỷ đồng', result)
+
     def test_full_publisher_body_wins_over_short_structured_description(self):
         for container in ('<div id="content_detail_news">', '<div class="entry-body">',
                           '<div class="article-detail-content">', '<div class="post-detail-body"><div class="ql-editor">'):

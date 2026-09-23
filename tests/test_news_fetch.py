@@ -32,11 +32,28 @@ class NewsFetchTests(unittest.TestCase):
     @patch('news_fetch.requests.get')
     def test_exact_publisher_match_reads_article_without_google(self, get, decoder):
         title = 'Triển vọng tăng trưởng của ngân hàng VCB'
+        full_article = ARTICLE + ' ' + ARTICLE
         get.side_effect = [response_with(f'<a href="/vcb">{title}</a>'.encode()),
-                           response_with(f'<div class="article-body"><p>{ARTICLE}</p></div>'.encode())]
+                           response_with(f'<div class="article-body"><p>{full_article}</p></div>'.encode())]
         result = read_source_article(GOOGLE_URL, title + ' - kinhtechungkhoan.vn')
-        self.assertEqual(result, ARTICLE)
+        self.assertEqual(result, full_article)
         decoder.assert_not_called()
+
+    @patch('news_fetch.publisher_index_url', return_value='https://example.com/teaser')
+    @patch('news_fetch.resolve_source_url', return_value=PUBLISHER_URL)
+    @patch('news_fetch.requests.get')
+    def test_short_archive_result_retries_original_article(self, get, resolve, index):
+        get.side_effect = [response_with(b'<meta name="description" content="Doanh nghiep teaser">'),
+                           response_with(f'<article><p>{ARTICLE}</p></article>'.encode())]
+        self.assertEqual(read_source_article(GOOGLE_URL, TITLE), ARTICLE)
+        self.assertEqual(get.call_count, 2)
+
+    @patch('news_fetch.publisher_index_url', return_value=PUBLISHER_URL)
+    @patch('news_fetch.resolve_source_url', side_effect=ArticleUnavailable('offline'))
+    @patch('news_fetch.requests.get')
+    def test_google_failure_keeps_usable_short_article(self, get, resolve, index):
+        get.return_value = response_with(f'<article><p>{ARTICLE}</p></article>'.encode())
+        self.assertEqual(read_source_article(GOOGLE_URL, TITLE), ARTICLE)
 
     @patch('news_fetch.requests.get')
     def test_publisher_match_rejects_other_domain_and_similar_title(self, get):

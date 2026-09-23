@@ -19,7 +19,8 @@ class ArticleUnavailable(Exception):
 # Only exact headline matches on the expected publisher are accepted.
 PUBLISHER_INDEXES = {
     'moneyf': ['https://moneyf.vn/'],
-    'chứng khoán dnse': ['https://www.dnse.com.vn/'],
+    'chứng khoán dnse': ['https://www.dnse.com.vn/senses/tin-tuc'],
+    '24hmoney': ['https://24hmoney.vn/'],
     'kinhtechungkhoan.vn': ['https://kinhtechungkhoan.vn/chung-khoan', 'https://kinhtechungkhoan.vn/bao-cao-phan-tich'],
     'cafef': ['https://cafef.vn/'],
     'vnexpress': ['https://vnexpress.net/kinh-doanh'],
@@ -43,9 +44,14 @@ def publisher_index_url(title):
     def norm(value):
         return re.sub(r'\W+', '', unicodedata.normalize('NFC', value).casefold())
     expected = norm(headline)
-    for index in PUBLISHER_INDEXES.get(publisher.casefold(), []):
+    indexes = list(PUBLISHER_INDEXES.get(publisher.casefold(), []))
+    if publisher.casefold() == 'nguoiquansat.vn':
+        # Its ticker archives retain older stories no longer on the homepage.
+        tickers = list(dict.fromkeys(re.findall(r'\b[A-Z]{3}\b', headline)))[:3]
+        indexes = [f'https://nguoiquansat.vn/{ticker.lower()}-ptag.html' for ticker in tickers] + indexes
+    for index in indexes:
         try:
-            response = requests.get(index, timeout=(5, 15))
+            response = requests.get(index, headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'vi,en;q=0.8'}, timeout=(5, 15))
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
             host = urlparse(index).hostname.removeprefix('www.')
@@ -121,7 +127,31 @@ def read_source_article(url, title=""):
     publisher_url = (publisher_feed_url(title) if urlparse(url).hostname == 'news.google.com' else None)
     if not publisher_url and urlparse(url).hostname == 'news.google.com':
         publisher_url = publisher_index_url(title)
-    publisher_url = publisher_url or resolve_source_url(url)
+    if not publisher_url:
+        return _read_publisher_article(resolve_source_url(url), title)
+    primary_error = None
+    try:
+        text = _read_publisher_article(publisher_url, title)
+    except ArticleUnavailable as exc:
+        primary_error, text = exc, ""
+    if len(text.split()) >= 80:
+        return text
+    # A publisher archive can link to a teaser. Try the original RSS target
+    # once as a fallback, retaining usable text if Google is unavailable.
+    try:
+        original_url = resolve_source_url(url)
+        if original_url != publisher_url:
+            alternative = _read_publisher_article(original_url, title)
+            if len(alternative.split()) > len(text.split()):
+                text = alternative
+    except ArticleUnavailable:
+        pass
+    if text:
+        return text
+    raise primary_error or ArticleUnavailable("Nguồn báo chưa cung cấp nội dung đọc được.")
+
+
+def _read_publisher_article(publisher_url, title):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36"}
     for attempt in range(2):
         try:
