@@ -88,5 +88,5 @@ def read_source_article(url, title=""):
                 continue
             raise ArticleUnavailable("Kết nối nguồn báo bị gián đoạn.") from exc
         except requests.RequestException as exc:
-            raise ArticleUnavailable("Nguồn báo tạm thời không cho tải bài.") from exc
+            raise ArticleUnavailable(f"Nguồn báo trả lỗi HTTP {response.status_code}; chưa tải được bài gốc.") from exc
     raise ArticleUnavailable("Chưa tải được bài gốc.")

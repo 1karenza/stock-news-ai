@@ -8,7 +8,7 @@ def process_cached(item, use_ai, model, cache, processor, *, now=None, ttl=900):
     for key in list(cache):
         if now - cache[key][0] >= ttl:
             del cache[key]
-    key = (item.get('url') or item['title'], item['title'], item.get('summary', ''), use_ai, model)
+    key = (item.get('url') or item['title'], item['title'], item.get('summary', ''), use_ai, model, 'publisher-body-v2')
     stored = cache.get(key)
     if stored is not None and not stored[1].get('article_text'):
         cache.pop(key)
