@@ -83,7 +83,7 @@ def summary_sentences(item, detail=False):
              "mục đích", "dự kiến", "so với", "do", "nhằm", "rủi ro", "ngày")
     ranked = sorted(range(1, len(unique)), key=lambda i: (
         -(2 * bool(re.search(r"\d", unique[i])) + sum(t in unique[i].lower() for t in terms)), i))
-    limit, budget = (6, 220) if detail else (4, 140)
+    limit, budget = (12, 520) if detail else (4, 140)
     selected, words = [0], len(unique[0].split())
     for i in ranked:
         count = len(unique[i].split())
