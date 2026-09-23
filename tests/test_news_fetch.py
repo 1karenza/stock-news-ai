@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from news_fetch import ArticleUnavailable, read_source_article, resolve_source_url
+from news_fetch import ArticleUnavailable, read_source_article, resolve_source_url, publisher_feed_url
 
 
 GOOGLE_URL = "https://news.google.com/rss/articles/test-article?oc=5"
@@ -28,6 +28,19 @@ def response_with(content, status=200):
 
 
 class NewsFetchTests(unittest.TestCase):
+    @patch('news_fetch.requests.get')
+    def test_publisher_page_resolves_exact_headline_when_feed_lags(self, get):
+        title = 'Con gái Chủ tịch PNJ bán thành công 18 triệu cổ phiếu'
+        link = '/con-gai-chu-tich-pnj-ban-thanh-cong-18-trieu-co-phieu.htm'
+        get.side_effect = [response_with(b'<rss><channel></channel></rss>'),
+                           response_with(f'<a href="{link}">{title}</a>'.encode('utf-8'))]
+        self.assertEqual(publisher_feed_url(title + ' - VnEconomy'), 'https://vneconomy.vn' + link)
+
+    @patch('news_fetch.requests.get')
+    def test_similar_headline_is_not_substituted(self, get):
+        get.return_value = response_with(b'<a href="/other.htm">Different news headline</a>')
+        self.assertIsNone(publisher_feed_url('Exact expected headline - VnEconomy'))
+
     @patch("news_fetch.gnewsdecoder")
     def test_direct_publisher_url_skips_google_decoder(self, decoder):
         self.assertEqual(resolve_source_url(PUBLISHER_URL), PUBLISHER_URL)
