@@ -28,6 +28,14 @@ class EquityTests(unittest.TestCase):
         raw['NuocNgoai']=None
         self.assertEqual(parse_ownership_structure(raw,'HPG')['groups'],[])
 
+    def test_ownership_chart_shortens_long_labels(self):
+        from ownership_chart import ownership_drawing
+        from reportlab.graphics import renderSVG
+        long_name = 'Cổ đông có tên rất dài để kiểm tra việc không bị tràn chữ trên biểu đồ'
+        svg = renderSVG.drawToString(ownership_drawing([{'Cổ đông': long_name, 'Tỷ lệ (%)': 25}], [], 'PNJ'))
+        self.assertNotIn(long_name, svg)
+        self.assertIn('…', svg)
+
     def test_pdf_calendar_matches_selected_month(self):
         bundle=make_bundle()
         month, rows=report_calendar_rows(bundle,'2026-05')

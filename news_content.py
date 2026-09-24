@@ -7,6 +7,19 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 
+def clean_article_text(text):
+    """Remove publisher UI/promotions from extracted, cached and AI text."""
+    noise = re.compile(
+        r"^(?:[#＃]\s*\S|bấm vào mỗi từ khóa|nhấn vào (?:mỗi )?từ khóa|"
+        r"kết nối truyền thông cùng|cài đặt tiện ích|xem hdsd|"
+        r"để theo dõi thị trường và mã chứng khoán mọi nơi|"
+        r"tải (?:ứng dụng|app) 24hmoney|đọc thêm\s*[:：]|tin liên quan\s*[:：])", re.I)
+    parts = re.split(r"\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", text)
+    kept = [part.strip() for part in parts
+            if part.strip() and not noise.search(re.sub(r"^\s*[-*•]\s+", "", part.strip()))]
+    return text.strip() if len(kept) == len(parts) else "\n".join(kept)
+
+
 def extract_article(document, title=""):
     soup = BeautifulSoup(document, "html.parser")
     structured = []
@@ -15,7 +28,7 @@ def extract_article(document, title=""):
         if isinstance(value, dict):
             body = value.get("articleBody")
             if isinstance(body, str):
-                structured.append(BeautifulSoup(body, "html.parser").get_text(" ", strip=True))
+                structured.append(clean_article_text(BeautifulSoup(body, "html.parser").get_text("\n", strip=True)))
             for child in value.values():
                 visit(child)
         elif isinstance(value, list):
@@ -27,7 +40,7 @@ def extract_article(document, title=""):
             visit(json.loads(script.string or script.get_text()))
         except (ValueError, TypeError):
             pass
-    for tag in soup.select("script, style, noscript, nav, aside, footer, .related-news, .related-articles"):
+    for tag in soup.select("script, style, noscript, nav, aside, footer, .related-news, .related-articles, .item-term-policy"):
         tag.decompose()
     candidates = []
     for selector in ("#content_detail_news", ".entry-body", ".article-detail-content", ".post-detail-body .ql-editor",
@@ -37,6 +50,9 @@ def extract_article(document, title=""):
         if selector == "article" and candidates:
             continue
         for node in soup.select(selector):
+            # 24HMoney's outer article container also contains tags and ads.
+            # Prefer its actual body instead of choosing the larger wrapper.
+            node = node.select_one('.news-content') or node
             # Keep facts in lists/tables as well as prose, without copying nested
             # paragraphs twice (a common publisher layout).
             blocks = node.select("p, li, tr, div.paragraph")
@@ -50,6 +66,7 @@ def extract_article(document, title=""):
             text = "\n".join(p for p in paras if len(p) > 15)
             if not text:
                 text = node.get_text(" ", strip=True)
+            text = clean_article_text(text)
             if len(text) >= 180:
                 candidates.append(text)
     if candidates:
@@ -65,14 +82,14 @@ def extract_article(document, title=""):
         content_words = set(re.findall(r"\w{3,}", text.lower()))
         if len(title_words & content_words) < 2:
             return ""
-    return text
+    return clean_article_text(text)
 
 
-def summary_sentences(item, detail=False):
+def summary_sentences(item, detail=False, *, max_points=None, word_budget=None):
     title = re.sub(r"\s+-\s+[^-]+$", "", item.get("title", "")).strip()
     source = item.get("article_text") or item.get("summary") or title
     source = BeautifulSoup(source, "html.parser").get_text(" ", strip=True)
-    source = re.sub(r"[^\S\n]+", " ", source).strip()
+    source = clean_article_text(re.sub(r"[^\S\n]+", " ", source).strip())
     sentences = re.split(r"\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
     unique, seen = [], set()
     for sentence in sentences:
@@ -91,6 +108,8 @@ def summary_sentences(item, detail=False):
     ranked = sorted(range(1, len(unique)), key=lambda i: (
         -(2 * bool(re.search(r"\d", unique[i])) + sum(t in unique[i].lower() for t in terms)), i))
     limit, budget = ((16, 550) if len(source.split()) > 900 else (12, 400)) if detail else (4, 140)
+    limit = max_points if max_points is not None else limit
+    budget = word_budget if word_budget is not None else budget
     if detail:
         # Reserve coverage for context, plans and qualifications before filling
         # the remaining space with numeric facts. Output stays in source order.
@@ -123,6 +142,7 @@ def _summary_source(item, ai_text=None):
     normalize = lambda text: re.sub(r"\W+", "", text.casefold())
     source = ai_text or item.get("article_text") or item.get("summary", "")
     source = BeautifulSoup(source, "html.parser").get_text(" ", strip=True)
+    source = clean_article_text(source)
     source = re.sub(r"(?m)^\s*(?:#{1,6}\s+|[-*•]\s+|\d+[.)]\s+)", "", source)
     source = source.replace("**", "")
     parts = re.split(r"\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ỹ0-9\"“])", source)
@@ -132,25 +152,20 @@ def _summary_source(item, ai_text=None):
 
 
 def summary_bullets(item, ai_text=None):
-    """Four to eight evidence-based points when enough source facts exist."""
+    """Only the main facts, at most eight points; never pad short sources."""
     source = _summary_source(item, ai_text)
     if not source or len(source.split()) < 8:
         return []
-    points = summary_sentences({"title": "", "article_text": source}, detail=True)[:8]
-    # Old cached AI paragraphs may contain too few points. Prefer the actual
-    # article over padding the result or repeating a point to meet the minimum.
-    if ai_text and len(points) < 4:
-        original = summary_bullets(item)
-        if len(original) > len(points):
-            return original
-    return points
+    return summary_sentences({"title": "", "article_text": source}, detail=True,
+                             max_points=8, word_budget=220)
 
 
 def summary_paragraph(item, ai_text=None):
     """Compact plain text for the exported table."""
     source = _summary_source(item, ai_text)
     if not source or len(source.split()) < 8:
-        return "Chưa tải được nội dung đủ để tóm tắt. Bạn có thể thử tải lại hoặc mở bài gốc."
+        title = re.sub(r"\s+-\s+[^-]+$", "", item.get("title", "")).strip()
+        return title or "Chưa tải được nội dung đủ để tóm tắt. Bạn có thể thử tải lại hoặc mở bài gốc."
     return " ".join(summary_sentences({"title": "", "article_text": source}))
 
 

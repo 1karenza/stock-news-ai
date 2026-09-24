@@ -19,6 +19,9 @@ def ownership_drawing(rows, groups, ticker):
     cx,cy,r=550,335,145
     def text(x,y,value,size=12,color='#262626',anchor='start'):
         d.add(String(x,y,value,fontName=FONT,fontSize=size,fillColor=colors.HexColor(color),textAnchor=anchor))
+    def short_label(value, limit=30):
+        value = ' '.join(str(value).split())
+        return value if len(value) <= limit else value[:limit - 1].rstrip() + '…'
     text(cx,617,'Biểu đồ cơ cấu sở hữu',14,'#616875',anchor='middle')
     title = 'Tập đoàn Vingroup - Công ty Cổ phần (VIC)' if ticker == 'VIC' else f'Cơ cấu sở hữu · {ticker}'
     text(cx,590,title,18,anchor='middle')
@@ -67,11 +70,11 @@ def ownership_drawing(rows, groups, ticker):
             y=positions[j]
             edge=cx+side*175; tx=cx+side*195
             d.add(PolyLine([cx+r*math.cos(mid),cy+r*math.sin(mid),edge,y,tx-side*8,y],strokeColor=colors.HexColor(color),strokeWidth=.8))
-            lines=textwrap.wrap(row['Cổ đông'],width=43) or ['']
-            for k,line in enumerate(lines): text(tx,y-k*13,line,10,anchor='start' if side==1 else 'end')
+            lines=(textwrap.wrap(short_label(row['Cổ đông']),width=25) or [''])[:2]
+            for k,line in enumerate(lines): text(tx,y-k*12,line,9,anchor='start' if side==1 else 'end')
             text(tx,y-len(lines)*13,f"{row['Tỷ lệ (%)']:.2f}%",10,'#616875','start' if side==1 else 'end')
     for i,g in enumerate(nonzero):
         x=90+i*350
         d.add(Circle(x,40,6,fillColor=colors.HexColor(inner_colors[i%3]),strokeColor=None))
-        text(x+14,36,f"{g['Nhóm']} ({g['Tỷ lệ (%)']:.2f}%)",11)
+        text(x+14,36,f"{short_label(g['Nhóm'], 27)} ({g['Tỷ lệ (%)']:.2f}%)",10)
     return d

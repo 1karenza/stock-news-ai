@@ -30,9 +30,30 @@ class NewsContentTests(unittest.TestCase):
         point = "Doanh nghiệp dự kiến phát hành 171 triệu cổ phiếu từ lợi nhuận chưa phân phối."
         self.assertEqual(summary_bullets({"article_text": point}), [point])
 
-    def test_old_ai_paragraph_uses_article_to_supply_four_points(self):
+    def test_title_is_fallback_when_source_has_no_summary(self):
+        item = {"title": "Cổ phiếu PNJ tăng mạnh - Nguồn báo", "summary": ""}
+        self.assertEqual(summary_paragraph(item), "Cổ phiếu PNJ tăng mạnh")
+
+    def test_short_ai_summary_is_not_expanded_to_meet_a_minimum(self):
         points = summary_bullets({"article_text": ARTICLE}, ai_text="Doanh nghiệp công bố kế hoạch phát hành cổ phiếu thưởng cho cổ đông hiện hữu.")
-        self.assertGreaterEqual(len(points), 4)
+        self.assertEqual(len(points), 1)
+
+    def test_promotional_text_is_removed_from_cached_and_ai_summaries(self):
+        fact = "Techcombank dự kiến chia cổ tức bằng cổ phiếu với tỷ lệ 50% trong năm 2026."
+        noise = ["Bấm vào mỗi từ khóa để xem bài cùng chủ đề", "#Ngân hàng TMCP Kỹ thương Việt Nam",
+                 "Kết nối truyền thông cùng 24HMONEY ?", "Cài đặt tiện ích 24HMoney extension",
+                 "để theo dõi thị trường và mã chứng khoán mọi nơi trên trình duyệt Chrome",
+                 "Xem HDSD để tận dụng tối đa tiện ích"]
+        text = '\n'.join([fact] + noise)
+        self.assertEqual(summary_bullets({'article_text': text}), [fact])
+        self.assertEqual(summary_bullets({'article_text': ARTICLE}, ai_text=text), [fact])
+        self.assertEqual(summary_bullets({'article_text': '\n'.join(noise)}), [])
+
+    def test_inner_article_body_excludes_outer_promotions(self):
+        document = ('<div class="article-detail-content"><div class="news-content"><p>' + ARTICLE +
+                    '</p></div><p>Hướng dẫn sử dụng các tính năng của nền tảng dành cho bạn đọc.</p>'
+                    '<p>Cài đặt tiện ích 24HMoney extension trên trình duyệt của bạn.</p></div>')
+        self.assertEqual(extract_article(document), ARTICLE)
 
     def test_detail_is_longer_and_retains_conditions_without_inventing_facts(self):
         sentences = [
@@ -60,7 +81,7 @@ class NewsContentTests(unittest.TestCase):
         title = "FPT phát hành cổ phiếu thưởng cho cổ đông hiện hữu"
         for text in (title, title + " - Nguồn báo", "<a>" + title + "</a> - Nguồn báo"):
             item = {"title": title + " - Nguồn báo", "summary": text}
-            self.assertIn("Chưa tải được nội dung", summary_paragraph(item))
+            self.assertEqual(summary_paragraph(item), title)
 
     def test_ai_multiline_text_is_presented_as_one_paragraph(self):
         result = summary_paragraph({"title": "Tiêu đề"}, ai_text="- " + ARTICLE.replace(". ", ".\n- "))
