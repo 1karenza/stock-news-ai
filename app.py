@@ -2,6 +2,8 @@ import os
 import re
 import html
 import calendar
+import hashlib
+import json
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote_plus
 
@@ -13,6 +15,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from news_content import summary_sentences, summary_paragraph, summary_bullets, clean_article_text, news_table
 from news_cache import process_cached
+from gemini_runtime import DEFAULT_MODELS, ApiKeyEntry, generate_with_fallback, list_text_models, load_sheet_keys
 from news_fetch import ArticleUnavailable, read_source_article
 from investor_profile import (get_profile, persist_profile, watchlist_selector, workspace_view,
                               article_controls, article_id, mark_seen, changed)
@@ -21,12 +24,6 @@ from equity_pdf import build_pdf
 from investor_profile import parse_tickers
 
 load_dotenv()
-
-try:
-    from openai import OpenAI
-except Exception:
-    OpenAI = None
-
 
 st.set_page_config(
     page_title="Stock News AI Dashboard",
@@ -55,6 +52,46 @@ COMPANY_NAMES = {
     "DBC": "Dabaco", "MML": "Masan MEATLife", "HAG": "Hoàng Anh Gia Lai",
     "DGW": "Digiworld", "PVS": "PVS", "KDH": "Khang Điền", "NLG": "Nam Long"
 }
+
+GEMINI_SHEET_ID = os.getenv("GEMINI_SHEET_ID", "1Nf1OKX2FdrnS2kxZPKk3d7zjgMYrOI5dx7JXBEw9uaE")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_sheet_keys(spreadsheet_id, service_account_info):
+    return load_sheet_keys(spreadsheet_id, service_account_info)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_gemini_models(api_key):
+    return list_text_models(api_key)
+
+
+def configured_api_keys():
+    """Prefer the private Sheet; allow one environment key for local development."""
+    warning = None
+    try:
+        raw_info = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+        if raw_info:
+            service_account_info = json.loads(raw_info)
+        else:
+            try:
+                service_account_info = dict(st.secrets["gcp_service_account"])
+            except (FileNotFoundError, KeyError):
+                service_account_info = None
+        if service_account_info:
+            entries = cached_sheet_keys(GEMINI_SHEET_ID, service_account_info)
+            if entries:
+                return entries, None
+            warning = "Tab API Keys chưa có key đang hoạt động."
+        else:
+            warning = "Chưa cấu hình service account để đọc Google Sheet."
+    except Exception:
+        warning = "Không đọc được tab API Keys. Kiểm tra quyền truy cập và cấu hình Google Sheets."
+
+    fallback_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if fallback_key:
+        return [ApiKeyEntry("Key cục bộ", fallback_key)], warning
+    return [], warning
 
 
 def clean_text(raw: str) -> str:
@@ -223,18 +260,12 @@ def extract_bond_info(text: str) -> str:
     return " | ".join(parts[:3]) if parts else "Có nhắc trái phiếu"
 
 
-def ai_detailed_summary(item, article_text, model):
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key or OpenAI is None:
-        return None
-
+def ai_detailed_summary(item, article_text, ai_config):
     if len(article_text.split()) < 80:
-        return None
+        return None, None, None
     evidence = clean_article_text(article_text)
-    client = OpenAI(api_key=api_key)
-
-    response = client.responses.create(
-        model=model,
+    result = generate_with_fallback(
+        ai_config["api_key"], ai_config["models"],
         instructions=(
             "Bạn là trợ lý phân tích tin chứng khoán Việt Nam. "
             "Chỉ dùng dữ liệu được cung cấp, tuyệt đối không bịa số liệu. "
@@ -257,15 +288,18 @@ def ai_detailed_summary(item, article_text, model):
             "Nếu bài có thông tin trái phiếu, trích rõ quy mô phát hành, kỳ hạn, "
             "lãi suất và mục đích sử dụng vốn nếu có."
         ),
-        input=f"""
+        content=f"""
 Mã: {item['ticker']}
 Tiêu đề: {item['title']}
 Nguồn: {item['source']}
 Nội dung:
 {evidence[:24000]}
 """,
+        auto_switch=ai_config["auto_switch"],
     )
-    return "\n".join(summary_bullets(item, ai_text=response.output_text.strip()))
+    if not result.text:
+        return None, None, result.error
+    return "\n".join(summary_bullets(item, ai_text=result.text)), result.model, None
 
 
 def merge_articles(all_news, watched_tickers):
@@ -292,8 +326,10 @@ def merge_articles(all_news, watched_tickers):
     return rows
 
 
-def process_article(item, use_ai=False, model="gpt-5.6-luna"):
+def process_article(item, use_ai=False, ai_config=None):
     item["ai_detail"] = None
+    item["ai_model"] = None
+    item["ai_error"] = None
     try:
         article_text = read_source_article(item["url"], item["title"])
         item.pop("article_error", None)
@@ -302,11 +338,11 @@ def process_article(item, use_ai=False, model="gpt-5.6-luna"):
         item["article_error"] = str(exc)
     item["article_text"] = article_text
 
-    if use_ai and len(article_text.split()) >= 80 and os.getenv("OPENAI_API_KEY", "").strip():
+    if use_ai and len(article_text.split()) >= 80 and ai_config and ai_config.get("api_key"):
         try:
-            item["ai_detail"] = ai_detailed_summary(item, article_text, model)
+            item["ai_detail"], item["ai_model"], item["ai_error"] = ai_detailed_summary(item, article_text, ai_config)
         except Exception:
-            item["ai_detail"] = None
+            item["ai_error"] = "Không thể tóm tắt bằng Gemini. Hãy thử quét lại."
 
     item["bond_info"] = extract_bond_info(
         f"{item['title']} {item['summary']} {article_text}"
@@ -527,13 +563,49 @@ with tab_news:
         days = st.selectbox("Khoảng tin", [1, 3, 7, 14, 30], index=2, format_func=lambda value: f"{value} ngày gần nhất", key="news_days")
         max_items = st.slider("Số bài tối đa / mã", 5, 30, 12, 1, key="news_max")
         use_ai = st.toggle("Dùng AI để tóm tắt sâu", value=False, key="news_ai")
-        model = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
-        if use_ai:
-            model = st.text_input("OpenAI model", value=model, key="news_model")
         scan_col, report_col = st.columns([4,1], gap="small")
         with scan_col:
             run = st.button("Quét và phân tích  ↗", type="primary", width="stretch", key="news_run")
         report_slot = report_col.empty()
+        api_keys, key_warning = configured_api_keys()
+        if key_warning and use_ai:
+            st.caption(key_warning)
+        key_labels = [entry.label for entry in api_keys]
+        selected_key_label = st.selectbox(
+            "API key Google AI Studio",
+            key_labels if key_labels else ["Chưa có API key"],
+            key="news_key_label",
+            disabled=not use_ai or not api_keys,
+            on_change=lambda: st.session_state.pop("news_models", None),
+        )
+        selected_key = next((entry.value for entry in api_keys if entry.label == selected_key_label), "")
+        model_options = DEFAULT_MODELS
+        if use_ai and selected_key:
+            try:
+                model_options = cached_gemini_models(selected_key) or DEFAULT_MODELS
+            except (requests.RequestException, ValueError):
+                st.caption("Chưa tải được danh sách model; đang dùng danh sách dự phòng.")
+        default_model = "gemini-2.5-flash" if "gemini-2.5-flash" in model_options else model_options[0]
+        selected_models = st.multiselect(
+            "Mô hình Gemini (theo thứ tự ưu tiên)",
+            model_options,
+            default=[default_model],
+            key="news_models",
+            disabled=not use_ai or not selected_key,
+        )
+        if use_ai and selected_key and not selected_models:
+            st.caption("Chọn ít nhất một mô hình Gemini để tóm tắt bằng AI.")
+        auto_switch = st.toggle(
+            "Tự chuyển model khi lỗi",
+            value=False,
+            key="news_auto_switch",
+            disabled=not use_ai or len(selected_models) < 2,
+        )
+        ai_config = {
+            "api_key": selected_key,
+            "models": tuple(selected_models),
+            "auto_switch": bool(auto_switch and len(selected_models) > 1),
+        }
         st.caption("Tin vừa tải được dùng lại trong 15 phút. Đổi mã chỉ tải thêm phần chưa có.")
 
     tickers = parse_tickers(ticker_text)
@@ -584,8 +656,15 @@ with tab_news:
 
         for i, item in enumerate(merged):
             status.write(f"Đang đọc bài {i+1}/{len(merged)}: {item['title'][:80]}...")
-            processed.append(process_cached(item, use_ai, model,
-                             st.session_state.setdefault('processed_news_cache', {}), process_article))
+            cache_token = (
+                ai_config["models"], ai_config["auto_switch"],
+                hashlib.sha256(selected_key.encode()).hexdigest() if selected_key else "",
+            )
+            processed.append(process_cached(
+                item, use_ai, cache_token,
+                st.session_state.setdefault('processed_news_cache', {}),
+                lambda article, enabled, _token: process_article(article, enabled, ai_config),
+            ))
             progress.progress((i + 1) / max(1, len(merged)))
 
         status.empty()
@@ -607,7 +686,7 @@ with tab_news:
         if st.button("Tải lại các bài còn thiếu  ↻", key="retry_missing_articles"):
             retry_progress = st.progress(0, text="Đang tải lại nội dung bài gốc…")
             for index, item in enumerate(missing_articles):
-                process_article(item, use_ai, model)
+                process_article(item, use_ai, ai_config)
                 retry_progress.progress((index + 1) / len(missing_articles))
             retry_progress.empty()
             st.rerun()
@@ -698,6 +777,11 @@ with tab_news:
                         st.markdown(f'<ul class="article-summary"><li>{html.escape(title_fallback)}</li></ul>', unsafe_allow_html=True)
                     else:
                         st.caption("Chưa tải được nội dung đủ để tóm tắt. Bạn có thể thử tải lại hoặc mở bài gốc.")
+
+                if item.get("ai_model"):
+                    st.caption("Đã phân tích bằng " + item["ai_model"])
+                elif item.get("ai_error"):
+                    st.caption(item["ai_error"])
 
                 if len(item.get("article_text", "").split()) < 80:
                     if item.get("article_error"):

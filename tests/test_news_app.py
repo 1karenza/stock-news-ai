@@ -1,4 +1,5 @@
 import unittest
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -26,6 +27,29 @@ class NewsAppTests(unittest.TestCase):
 
     def tearDown(self):
         st.cache_data.clear()
+
+    def test_gemini_controls_remain_usable_without_configured_keys(self):
+        app = AppTest.from_file(str(APP_PATH), default_timeout=30)
+        with patch("equity_views.load_equity", side_effect=make_bundle):
+            app.run()
+            app.toggle(key="news_ai").set_value(True).run()
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(app.selectbox(key="news_key_label").value, "Chưa có API key")
+        self.assertEqual(app.multiselect(key="news_models").value, ["gemini-2.5-flash"])
+
+    def test_gemini_controls_allow_multiple_models_and_auto_switch(self):
+        app = AppTest.from_file(str(APP_PATH), default_timeout=30)
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+             patch("gemini_runtime.list_text_models", return_value=("gemini-2.5-flash", "gemini-2.5-pro")), \
+             patch("equity_views.load_equity", side_effect=make_bundle):
+            app.run()
+            app.toggle(key="news_ai").set_value(True).run()
+            app.multiselect(key="news_models").set_value(["gemini-2.5-flash", "gemini-2.5-pro"]).run()
+            app.toggle(key="news_auto_switch").set_value(True).run()
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(app.selectbox(key="news_key_label").value, "Key cục bộ")
+        self.assertEqual(app.multiselect(key="news_models").value, ["gemini-2.5-flash", "gemini-2.5-pro"])
+        self.assertTrue(app.toggle(key="news_auto_switch").value)
 
     def test_retry_recovers_after_failed_read_without_caching_the_failure(self):
         item = {

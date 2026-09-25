@@ -15,8 +15,9 @@ def process_cached(item, use_ai, model, cache, processor, *, now=None, ttl=900):
         stored = None
     if stored is None:
         result = processor(copy.deepcopy(item), use_ai, model)
-        if len(result.get('article_text', '').split()) < 80:
+        if len(result.get('article_text', '').split()) < 80 or (use_ai and not result.get('ai_detail')):
             return result
-        cache[key] = (now, {k: copy.deepcopy(result.get(k)) for k in ('article_text', 'ai_detail', 'bond_info')})
+        cache[key] = (now, {k: copy.deepcopy(result.get(k)) for k in
+                            ('article_text', 'ai_detail', 'ai_model', 'ai_error', 'bond_info')})
     # Watchlist membership is recalculated each scan, never copied from the cache.
     return {**item, **copy.deepcopy(cache[key][1])}

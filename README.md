@@ -79,6 +79,23 @@ git push origin main
 ```
 
 Không commit `.venv`, `.env`, API keys hoặc `.streamlit/secrets.toml`.
-App chạy không cần OpenAI key; nếu bật AI, thêm key trong Streamlit Secrets.
+App chạy không cần Gemini key; nếu bật AI, chọn key và model ở dưới nút
+**Quét và phân tích**. Chọn nhiều model và bật **Tự chuyển model khi lỗi** để
+thử model kế tiếp khi model trước tạm thời không khả dụng.
+
+### Google Sheet API Keys
+
+App đọc tab `API Keys` trong Google Sheet được cấu hình bởi `GEMINI_SHEET_ID`.
+Hàng đầu là `Tên key | API key | Bật`; từ hàng 2, mỗi hàng chứa một tên hiển thị
+duy nhất, một Gemini API key và `TRUE`/`FALSE` (để trống cũng được bật).
+Giữ Google Sheet ở chế độ riêng tư. App chỉ hiển thị tên key, không hiển thị
+giá trị key. Danh sách model được lấy từ Gemini API theo key đang chọn.
+
+Để app đọc Sheet riêng tư, bật Google Sheets API trong dự án Google Cloud,
+tạo service account, chia sẻ Sheet cho email service account với quyền xem,
+rồi lưu nội dung JSON của service account dưới bảng `[gcp_service_account]`
+trong Streamlit Secrets. Có thể dùng biến môi trường `GOOGLE_SERVICE_ACCOUNT_JSON`
+chứa toàn bộ JSON khi chạy cục bộ. Nếu chưa cấu hình Sheet, có thể dùng
+`GEMINI_API_KEY` trong `.env` cho một key cục bộ; không đưa key thật vào repo.
 Theme nằm ở `.streamlit/config.toml`, style ở `assets/editorial.css`.
 League Spartan có font dự phòng; giao diện hỗ trợ bàn phím và reduced motion.
