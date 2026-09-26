@@ -67,6 +67,32 @@ def _fetch_yahoo_prices(ticker, period):
         raise PriceUnavailable("Yahoo Finance chưa cung cấp lịch sử giá mã này.") from exc
 
 
+def _fetch_simplize_prices(ticker, period):
+    months, _ = PRICE_PERIODS[period]
+    try:
+        response = requests.get(
+            "https://api2.simplize.vn/api/historical/prices/ohlcv",
+            params={"ticker": ticker}, headers={"User-Agent": "Mozilla/5.0",
+                                                 "Origin": "https://simplize.vn"}, timeout=(5, 15))
+        response.raise_for_status()
+        payload = response.json()
+        data = payload.get("data")
+        if payload.get("status") != 200 or not isinstance(data, list) or len(data) > 10000:
+            raise ValueError("Phản hồi giá không hợp lệ")
+        if any(not isinstance(row, list) or len(row) != 6 for row in data):
+            raise ValueError("Cột giá không hợp lệ")
+        frame = pd.DataFrame(data, columns=["timestamp", "open", "high", "low", "close", "volume"])
+        frame["date"] = pd.to_datetime(pd.to_numeric(frame["timestamp"], errors="raise"),
+                                       unit="s", utc=True).dt.tz_convert("Asia/Ho_Chi_Minh").dt.tz_localize(None).dt.normalize()
+        cutoff = (pd.Timestamp.now(tz="Asia/Ho_Chi_Minh").tz_localize(None).normalize()
+                  - pd.DateOffset(months=months))
+        frame = validate_prices(frame.loc[frame["date"] >= cutoff, ["date", "close", "volume"]])
+        return frame, _price_meta("Simplize", ticker,
+                                  "Giá OHLCV do Simplize cung cấp; chưa xác minh điều chỉnh chia tách hoặc cổ tức.")
+    except (requests.RequestException, ValueError, KeyError, TypeError, IndexError) as exc:
+        raise PriceUnavailable("Simplize chưa cung cấp lịch sử giá mã này.") from exc
+
+
 def _fetch_vietcap_prices(ticker, period):
     months, count_back = PRICE_PERIODS[period]
     try:
@@ -103,9 +129,12 @@ def fetch_prices(ticker, period="3mo"):
         return _fetch_yahoo_prices(ticker, period)
     except PriceUnavailable:
         try:
-            return _fetch_vietcap_prices(ticker, period)
-        except PriceUnavailable as exc:
-            raise PriceUnavailable("Chưa lấy được lịch sử giá từ Yahoo Finance hoặc Vietcap.") from exc
+            return _fetch_simplize_prices(ticker, period)
+        except PriceUnavailable:
+            try:
+                return _fetch_vietcap_prices(ticker, period)
+            except PriceUnavailable as exc:
+                raise PriceUnavailable("Chưa lấy được lịch sử giá từ Yahoo Finance, Simplize hoặc Vietcap.") from exc
 
 
 def align_news(prices, articles, ticker):
