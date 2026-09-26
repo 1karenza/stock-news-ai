@@ -585,7 +585,9 @@ with tab_news:
                 model_options = cached_gemini_models(selected_key) or DEFAULT_MODELS
             except (requests.RequestException, ValueError):
                 st.caption("Chưa tải được danh sách model; đang dùng danh sách dự phòng.")
-        default_model = "gemini-2.5-flash" if "gemini-2.5-flash" in model_options else model_options[0]
+        preferred_models = tuple(model for model in DEFAULT_MODELS if model in model_options)
+        model_options = preferred_models + tuple(model for model in model_options if model not in preferred_models)
+        default_model = model_options[0]
         selected_models = st.multiselect(
             "Mô hình Gemini (theo thứ tự ưu tiên)",
             model_options,

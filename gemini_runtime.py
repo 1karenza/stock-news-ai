@@ -7,7 +7,7 @@ from urllib.parse import quote
 import requests
 
 
-DEFAULT_MODELS = ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro")
+DEFAULT_MODELS = ("gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash")
 SHEET_RANGE = "'API Keys'!A2:C"
 RECOVERABLE_STATUSES = {400, 404, 408, 429, 500, 502, 503, 504}
 
