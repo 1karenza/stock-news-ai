@@ -35,7 +35,23 @@ class NewsAppTests(unittest.TestCase):
             app.toggle(key="news_ai").set_value(True).run()
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(app.selectbox(key="news_key_label").value, "Chưa có API key")
-        self.assertEqual(app.multiselect(key="news_models").value, ["gemini-2.5-flash"])
+        self.assertEqual(app.multiselect(key="news_models").value, ["gemini-3.5-flash-lite"])
+
+    def test_gemini_settings_can_be_prepared_before_turning_ai_on(self):
+        app = AppTest.from_file(str(APP_PATH), default_timeout=30)
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}), \
+             patch("gemini_runtime.list_text_models", return_value=("gemini-3.5-flash-lite", "gemini-3.8-flash")), \
+             patch("equity_views.load_equity", side_effect=make_bundle):
+            app.run()
+            self.assertFalse(app.toggle(key="news_ai").value)
+            self.assertFalse(app.selectbox(key="news_key_label").disabled)
+            self.assertFalse(app.multiselect(key="news_models").disabled)
+            self.assertFalse(app.toggle(key="news_auto_switch").disabled)
+            app.multiselect(key="news_models").set_value(["gemini-3.5-flash-lite", "gemini-3.8-flash"]).run()
+            app.toggle(key="news_auto_switch").set_value(True).run()
+        self.assertEqual(len(app.exception), 0)
+        self.assertFalse(app.toggle(key="news_ai").value)
+        self.assertTrue(app.toggle(key="news_auto_switch").value)
 
     def test_gemini_controls_allow_multiple_models_and_auto_switch(self):
         app = AppTest.from_file(str(APP_PATH), default_timeout=30)

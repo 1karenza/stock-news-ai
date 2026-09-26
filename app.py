@@ -575,12 +575,12 @@ with tab_news:
             "API key Google AI Studio",
             key_labels if key_labels else ["Chưa có API key"],
             key="news_key_label",
-            disabled=not use_ai or not api_keys,
+            disabled=not api_keys,
             on_change=lambda: st.session_state.pop("news_models", None),
         )
         selected_key = next((entry.value for entry in api_keys if entry.label == selected_key_label), "")
         model_options = DEFAULT_MODELS
-        if use_ai and selected_key:
+        if selected_key:
             try:
                 model_options = cached_gemini_models(selected_key) or DEFAULT_MODELS
             except (requests.RequestException, ValueError):
@@ -593,7 +593,7 @@ with tab_news:
             model_options,
             default=[default_model],
             key="news_models",
-            disabled=not use_ai or not selected_key,
+            disabled=not selected_key,
         )
         if use_ai and selected_key and not selected_models:
             st.caption("Chọn ít nhất một mô hình Gemini để tóm tắt bằng AI.")
@@ -601,8 +601,10 @@ with tab_news:
             "Tự chuyển model khi lỗi",
             value=False,
             key="news_auto_switch",
-            disabled=not use_ai or len(selected_models) < 2,
+            disabled=not selected_key,
         )
+        if auto_switch and len(selected_models) < 2:
+            st.caption("Chọn thêm ít nhất một mô hình để tự chuyển khi gặp lỗi.")
         ai_config = {
             "api_key": selected_key,
             "models": tuple(selected_models),
