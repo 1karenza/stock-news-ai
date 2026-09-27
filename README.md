@@ -86,6 +86,8 @@ thử model kế tiếp khi model trước tạm thời không khả dụng.
 ### Google Sheet API Keys
 
 App đọc tab `API Keys` trong Google Sheet được cấu hình bởi `GEMINI_SHEET_ID`.
+
+Khi Google News không mở được bài, bộ đọc đối chiếu tiêu đề trên trang báo và tìm đường dẫn qua RSS, trang danh mục hoặc sitemap công khai. `news_source_links.json` bổ sung các liên kết đã xác minh nhưng bị thiếu trong danh mục của báo, có kiểm tra ngày và tiêu đề trước khi dùng. Công bố doanh nghiệp có thể đọc từ bản đăng lại trên CafeF; giao diện ghi rõ nguồn nội dung thực tế. PDF có chữ được trích xuất bằng pypdf; PDF ảnh quét và ảnh tài liệu trong bài 24HMoney được gửi cùng yêu cầu Gemini khi bật AI. Nút tải lại xử lý cả lỗi lấy nội dung và lỗi tóm tắt AI.
 Hàng đầu là `Tên key | API key | Bật`; từ hàng 2, mỗi hàng chứa một tên hiển thị
 duy nhất, một Gemini API key và `TRUE`/`FALSE` (để trống cũng được bật).
 Giữ Google Sheet ở chế độ riêng tư. App chỉ hiển thị tên key, không hiển thị

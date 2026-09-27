@@ -11,6 +11,19 @@ def response(status, payload=None):
 
 
 class GeminiRuntimeTests(unittest.TestCase):
+    @patch('gemini_runtime.requests.post')
+    def test_scanned_disclosure_is_sent_as_pdf_with_text(self, post):
+        import base64
+        post.return_value = response(200, {'candidates': [{'content': {'parts': [{'text': 'Summary from PDF'}]}}]})
+        result = generate_with_fallback('key', ('gemini-test',), 'rules', 'notice', pdf_data=b'%PDF-test', image_data=[('image/jpeg', b'image-test')])
+        parts = post.call_args.kwargs['json']['contents'][0]['parts']
+        self.assertEqual(parts[0], {'text': 'notice'})
+        self.assertEqual(parts[1]['inlineData']['mimeType'], 'application/pdf')
+        self.assertEqual(base64.b64decode(parts[1]['inlineData']['data']), b'%PDF-test')
+        self.assertEqual(parts[2]['inlineData']['mimeType'], 'image/jpeg')
+        self.assertEqual(base64.b64decode(parts[2]['inlineData']['data']), b'image-test')
+        self.assertEqual(result.text, 'Summary from PDF')
+
     @patch("google.auth.transport.requests.AuthorizedSession")
     @patch("google.oauth2.service_account.Credentials.from_service_account_info")
     def test_sheet_loader_uses_read_only_scope_and_expected_tab(self, credentials, session):

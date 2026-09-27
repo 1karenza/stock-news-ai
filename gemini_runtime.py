@@ -91,7 +91,7 @@ def list_text_models(api_key):
     return tuple(dict.fromkeys(models))
 
 
-def generate_with_fallback(api_key, models, instructions, content, auto_switch=False):
+def generate_with_fallback(api_key, models, instructions, content, auto_switch=False, pdf_data=None, image_data=None):
     """Try selected models in order; only temporary/model errors trigger fallback."""
     choices = tuple(models if auto_switch else models[:1])
     if not api_key or not choices:
@@ -101,6 +101,15 @@ def generate_with_fallback(api_key, models, instructions, content, auto_switch=F
         "systemInstruction": {"parts": [{"text": instructions}]},
         "contents": [{"role": "user", "parts": [{"text": content}]}],
     }
+    if pdf_data:
+        import base64
+        body['contents'][0]['parts'].append({'inlineData': {
+            'mimeType': 'application/pdf', 'data': base64.b64encode(pdf_data).decode('ascii')}})
+    if image_data:
+        import base64
+        for mime, data in image_data:
+            body['contents'][0]['parts'].append({'inlineData': {
+                'mimeType': mime, 'data': base64.b64encode(data).decode('ascii')}})
     for index, model in enumerate(choices):
         if not re.fullmatch(r"gemini-[A-Za-z0-9_.-]+", model):
             return GeminiResult(None, None, "Tên mô hình Gemini không hợp lệ.")

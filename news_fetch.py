@@ -2,6 +2,7 @@
 from urllib.parse import urlparse, urljoin
 import re
 import logging
+from io import BytesIO
 import unicodedata
 import feedparser
 from bs4 import BeautifulSoup
@@ -10,6 +11,66 @@ import requests
 from news_transport import gnewsdecoder
 
 from news_content import extract_article
+from news_publishers import publisher_catalog_article, disclosure_article, split_title, known_article
+from pypdf import PdfReader
+
+
+class ArticleText(str):
+    def __new__(cls, text, source_url='', pdf_data=None, pdf_url='', image_data=None):
+        value = super().__new__(cls, text)
+        value.source_url = source_url
+        value.pdf_data = pdf_data
+        value.pdf_url = pdf_url
+        value.image_data = image_data or []
+        return value
+
+
+def article_document(document, title, source_url):
+    text = extract_article(document, title=title).strip()
+    # Exchange notices often put the substantive disclosure in an attached PDF.
+    if len(text.split()) < 80:
+        soup = BeautifulSoup(document, 'html.parser')
+        attachment_body = soup.select_one('.KenhF_Content_News3, #content_detail_news, .article-content, .article-body')
+        for anchor in attachment_body.select('a[href]') if attachment_body else []:
+            url = urljoin(source_url, anchor['href'])
+            host = urlparse(url).hostname or ''
+            if not urlparse(url).path.lower().endswith('.pdf') or host not in {'cafefnew.mediacdn.vn', 'static2.vietstock.vn', 'static.vietstock.vn'}:
+                continue
+            try:
+                response = requests.get(url, timeout=(5, 20))
+                response.raise_for_status()
+                if len(response.content) > 8_000_000 or not response.content.startswith(b'%PDF'):
+                    continue
+                pdf = PdfReader(BytesIO(response.content))
+                if len(pdf.pages) > 30:
+                    continue
+                body = '\n'.join(page.extract_text() or '' for page in pdf.pages)
+                if len(body.split()) >= 80:
+                    return ArticleText(text + '\n\nNội dung tài liệu công bố đính kèm:\n' + body[:40000], source_url)
+                return ArticleText(text, source_url, response.content, url)
+            except Exception as exc:
+                logging.warning('Could not read public disclosure PDF (%s)', type(exc).__name__)
+            break
+        # Some 24HMoney disclosures publish the document as screenshots.
+        if (urlparse(source_url).hostname or '').removeprefix('www.') == '24hmoney.vn':
+            images = []
+            for image in soup.select('.news-content figure.news-thumb img[src]')[:6]:
+                image_url = urljoin(source_url, image['src'])
+                parsed = urlparse(image_url)
+                if parsed.scheme != 'https' or parsed.hostname != 'cdn.24hmoney.vn' or '/article_img/' not in parsed.path:
+                    continue
+                try:
+                    response = requests.get(image_url, timeout=(5, 15))
+                    response.raise_for_status()
+                    data = response.content
+                    mime = 'image/jpeg' if data.startswith(b'\xff\xd8\xff') else 'image/png' if data.startswith(b'\x89PNG') else None
+                    if mime and len(data) <= 2_000_000:
+                        images.append((mime, data))
+                except requests.RequestException:
+                    continue
+            if images:
+                return ArticleText(text, source_url, image_data=images)
+    return ArticleText(text, source_url)
 
 
 class ArticleUnavailable(Exception):
@@ -35,12 +96,13 @@ PUBLISHER_INDEXES = {
     'baodautu.vn': ['https://baodautu.vn/'],
     'mekong asean': ['https://mekongasean.vn/'],
     'tin nhanh chứng khoán': ['https://www.tinnhanhchungkhoan.vn/'],
+    'tạp chí kinh tế - tài chính online': ['https://tapchikinhtetaichinh.vn/chung-khoan'],
 }
 
 
 def publisher_index_url(title):
-    headline, separator, publisher = title.rpartition(' - ')
-    if not separator:
+    headline, publisher = split_title(title)
+    if not headline:
         return None
     def norm(value):
         return re.sub(r'\W+', '', unicodedata.normalize('NFC', value).casefold())
@@ -50,6 +112,9 @@ def publisher_index_url(title):
         # Its ticker archives retain older stories no longer on the homepage.
         tickers = list(dict.fromkeys(re.findall(r'\b[A-Z]{3}\b', headline)))[:3]
         indexes = [f'https://nguoiquansat.vn/{ticker.lower()}-ptag.html' for ticker in tickers] + indexes
+    if publisher.casefold() == '24hmoney':
+        tickers = list(dict.fromkeys(re.findall(r'\b[A-Z]{3}\b', headline)))[:2]
+        indexes = [f'https://24hmoney.vn/stock/{ticker.lower()}/news' for ticker in tickers] + indexes
     for index in indexes:
         try:
             response = requests.get(index, headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'vi,en;q=0.8'}, timeout=(5, 15))
@@ -132,7 +197,7 @@ def publisher_permalink_article(title):
         text = extract_article(response.content, title=title).strip()
         if len(text.split()) < 80:
             logging.warning('Vietnam.vn article text too short (%s words): %s', len(text.split()), url)
-        return text if len(text.split()) >= 80 else None
+        return ArticleText(text, response.url) if len(text.split()) >= 80 else None
     except requests.RequestException as exc:
         logging.warning('Vietnam.vn article request failed: %s', exc)
         return None
@@ -156,7 +221,9 @@ def resolve_source_url(url):
     raise ArticleUnavailable("Chưa mở được đường dẫn Google News.")
 
 
-def read_source_article(url, title=""):
+def read_source_article(url, title="", published_at=None):
+    if urlparse(url).hostname != 'news.google.com':
+        return _read_publisher_article(url, title)
     if urlparse(url).hostname == 'news.google.com':
         direct_text = publisher_permalink_article(title)
         if direct_text:
@@ -165,6 +232,11 @@ def read_source_article(url, title=""):
     if not publisher_url and urlparse(url).hostname == 'news.google.com':
         publisher_url = publisher_index_url(title)
     if not publisher_url:
+        catalog = known_article(title, published_at) or disclosure_article(title) or publisher_catalog_article(title, published_at)
+        if catalog:
+            catalog_text = article_document(catalog[1], title, catalog[0])
+            if catalog_text:
+                return catalog_text
         return _read_publisher_article(resolve_source_url(url), title)
     primary_error = None
     try:
@@ -196,7 +268,7 @@ def _read_publisher_article(publisher_url, title):
             if response.status_code in (502, 503, 504) and attempt == 0:
                 continue
             response.raise_for_status()
-            text = extract_article(response.content, title=title)
+            text = article_document(response.content, title, response.url)
             if not text.strip():
                 raise ArticleUnavailable("Nguồn báo chưa cung cấp nội dung đọc được.")
             return text

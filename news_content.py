@@ -43,7 +43,7 @@ def extract_article(document, title=""):
     for tag in soup.select("script, style, noscript, nav, aside, footer, .related-news, .related-articles, .item-term-policy"):
         tag.decompose()
     candidates = []
-    for selector in ("#content_detail_news", ".entry-body", ".article-detail-content", ".post-detail-body",
+    for selector in ("#content_detail_news", "#explus-editor", ".KenhF_Content_News3", ".entry-body", ".article-detail-content", ".post-detail-body",
                      ".post-detail-body .ql-editor",
                      "[itemprop='articleBody']", ".article-editor", ".mekong-detail-body", ".article-body", ".article-content",
                      ".detail-content", ".content-detail", ".fck_detail", ".entry-content",
@@ -53,7 +53,8 @@ def extract_article(document, title=""):
         for node in soup.select(selector):
             # 24HMoney's outer article container also contains tags and ads.
             # Prefer its actual body instead of choosing the larger wrapper.
-            node = node.select_one('.news-content') or node
+            if selector in ('article', '.article-detail-content'):
+                node = node.select_one('.news-content') or node
             # Keep facts in lists/tables as well as prose, without copying nested
             # paragraphs twice (a common publisher layout).
             blocks = node.select("p, li, tr, div.paragraph")
