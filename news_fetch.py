@@ -1,6 +1,7 @@
 """Article retrieval. Failures raise so Streamlit never caches empty results."""
 from urllib.parse import urlparse, urljoin
 import re
+import logging
 import unicodedata
 import feedparser
 from bs4 import BeautifulSoup
@@ -117,18 +118,23 @@ def publisher_permalink_article(title):
         return None
     url = f'https://www.vietnam.vn/{slug}'
     try:
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=(5, 15))
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36'}, timeout=(5, 15))
         response.raise_for_status()
         if urlparse(response.url).hostname not in {'vietnam.vn', 'www.vietnam.vn'}:
+            logging.warning('Vietnam.vn article redirected to an unexpected host: %s', response.url)
             return None
         soup = BeautifulSoup(response.content, 'html.parser')
         heading = soup.find('h1')
         normalize = lambda value: re.sub(r'\W+', '', unicodedata.normalize('NFC', value).casefold())
         if not heading or normalize(heading.get_text(' ', strip=True)) != normalize(headline):
+            logging.warning('Vietnam.vn article headline did not match: %s', url)
             return None
         text = extract_article(response.content, title=title).strip()
+        if len(text.split()) < 80:
+            logging.warning('Vietnam.vn article text too short (%s words): %s', len(text.split()), url)
         return text if len(text.split()) >= 80 else None
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        logging.warning('Vietnam.vn article request failed: %s', exc)
         return None
 
 
