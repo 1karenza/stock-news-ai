@@ -43,7 +43,8 @@ def extract_article(document, title=""):
     for tag in soup.select("script, style, noscript, nav, aside, footer, .related-news, .related-articles, .item-term-policy"):
         tag.decompose()
     candidates = []
-    for selector in ("#content_detail_news", ".entry-body", ".article-detail-content", ".post-detail-body .ql-editor",
+    for selector in ("#content_detail_news", ".entry-body", ".article-detail-content", ".post-detail-body",
+                     ".post-detail-body .ql-editor",
                      "[itemprop='articleBody']", ".article-editor", ".mekong-detail-body", ".article-body", ".article-content",
                      ".detail-content", ".content-detail", ".fck_detail", ".entry-content",
                      ".post-content", ".detail__content", ".news-content", "article"):

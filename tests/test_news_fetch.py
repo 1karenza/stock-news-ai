@@ -3,7 +3,8 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from news_fetch import ArticleUnavailable, read_source_article, resolve_source_url, publisher_feed_url, publisher_index_url
+from news_fetch import (ArticleUnavailable, read_source_article, resolve_source_url,
+                        publisher_feed_url, publisher_index_url, publisher_permalink_article)
 
 
 GOOGLE_URL = "https://news.google.com/rss/articles/test-article?oc=5"
@@ -28,6 +29,27 @@ def response_with(content, status=200):
 
 
 class NewsFetchTests(unittest.TestCase):
+    @patch('news_fetch.gnewsdecoder')
+    @patch('news_fetch.requests.get')
+    def test_vietnam_publisher_article_bypasses_google_429(self, get, decoder):
+        title = 'VCBS dự báo lợi nhuận quý III/2026 của SSI, HCM và VCI giảm'
+        full_article = ARTICLE + ' ' + ARTICLE
+        document = (f'<h1>{title}</h1><div class="post-detail-body"><p>{full_article}</p></div>')
+        response = response_with(document.encode('utf-8'))
+        response.url = 'https://www.vietnam.vn/vcbs-du-bao-loi-nhuan-quy-iii-2026-cua-ssi-hcm-va-vci-giam'
+        get.return_value = response
+
+        self.assertEqual(read_source_article(GOOGLE_URL, title + ' - Vietnam.vn'), full_article)
+        decoder.assert_not_called()
+        self.assertEqual(get.call_args.args[0], response.url)
+
+    @patch('news_fetch.requests.get')
+    def test_vietnam_permalink_rejects_unrelated_headline(self, get):
+        response = response_with(f'<h1>Tin khác</h1><p>{ARTICLE * 3}</p>'.encode('utf-8'))
+        response.url = 'https://www.vietnam.vn/tin-khac'
+        get.return_value = response
+        self.assertIsNone(publisher_permalink_article('SSI công bố lợi nhuận - Vietnam.vn'))
+
     @patch('news_fetch.gnewsdecoder')
     @patch('news_fetch.requests.get')
     def test_exact_publisher_match_reads_article_without_google(self, get, decoder):

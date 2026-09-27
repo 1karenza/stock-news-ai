@@ -105,6 +105,33 @@ def publisher_feed_url(title):
     return None
 
 
+def publisher_permalink_article(title):
+    """Read Vietnam.vn's verified permalink when Google News blocks decoding."""
+    headline, separator, publisher = title.rpartition(' - ')
+    if not separator or publisher.casefold() != 'vietnam.vn':
+        return None
+    slug = unicodedata.normalize('NFKD', headline.casefold().replace('đ', 'd'))
+    slug = ''.join(char for char in slug if not unicodedata.combining(char))
+    slug = re.sub(r'[^a-z0-9]+', '-', slug).strip('-')
+    if not slug:
+        return None
+    url = f'https://www.vietnam.vn/{slug}'
+    try:
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=(5, 15))
+        response.raise_for_status()
+        if urlparse(response.url).hostname not in {'vietnam.vn', 'www.vietnam.vn'}:
+            return None
+        soup = BeautifulSoup(response.content, 'html.parser')
+        heading = soup.find('h1')
+        normalize = lambda value: re.sub(r'\W+', '', unicodedata.normalize('NFC', value).casefold())
+        if not heading or normalize(heading.get_text(' ', strip=True)) != normalize(headline):
+            return None
+        text = extract_article(response.content, title=title).strip()
+        return text if len(text.split()) >= 80 else None
+    except requests.RequestException:
+        return None
+
+
 def resolve_source_url(url):
     if urlparse(url).scheme not in ("http", "https"):
         raise ArticleUnavailable("Đường dẫn bài báo không hợp lệ.")
@@ -124,6 +151,10 @@ def resolve_source_url(url):
 
 
 def read_source_article(url, title=""):
+    if urlparse(url).hostname == 'news.google.com':
+        direct_text = publisher_permalink_article(title)
+        if direct_text:
+            return direct_text
     publisher_url = (publisher_feed_url(title) if urlparse(url).hostname == 'news.google.com' else None)
     if not publisher_url and urlparse(url).hostname == 'news.google.com':
         publisher_url = publisher_index_url(title)
