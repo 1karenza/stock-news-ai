@@ -1,6 +1,6 @@
 import unittest
 
-from broker_valuation import parse_reports, broker_table, latest_reports, sortable_broker_document
+from broker_valuation import parse_reports, broker_table, latest_reports, filterable_broker_document
 from equity_data import EquityUnavailable
 
 
@@ -35,8 +35,8 @@ class BrokerReportsTests(unittest.TestCase):
         self.assertEqual(len(rows), 3)
         self.assertEqual(latest_reports(rows, 2025)[0]['price'], 95000)
         self.assertEqual(latest_reports(rows)[0]['price'], 85000)
-        document = sortable_broker_document(rows)
-        self.assertEqual(document.count('aria-label="Sắp xếp theo'), 5)
+        document = filterable_broker_document(rows)
+        self.assertEqual(document.count('aria-label="Lọc '), 5)
         self.assertNotIn('data-column="4"', document)
         self.assertNotIn('data-column="6"', document)
         self.assertIn('data-sort="2025-12-01"', document)

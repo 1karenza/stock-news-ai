@@ -14,7 +14,7 @@ from reportlab.graphics import renderSVG
 import html
 from urllib.parse import urlparse
 from source_tables import source_table, source_link
-from broker_valuation import fetch_broker_reports, latest_reports, sortable_broker_document
+from broker_valuation import fetch_broker_reports, latest_reports, filterable_broker_document
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -39,8 +39,8 @@ def render_broker_valuation(ticker):
                         format_func=lambda value: 'Tất cả các năm' if value is None else str(value),
                         key=f'broker_year_{ticker}')
     visible = latest_reports(rows, year)
-    st.caption('Bấm tiêu đề cột để sắp xếp tăng/giảm. Cột Ngày sắp theo thời gian; mỗi CTCK hiển thị báo cáo mới nhất trong năm đã chọn.')
-    st.iframe(sortable_broker_document(visible), height='content')
+    st.caption('Bấm mũi tên ở tiêu đề cột để chọn giá trị cần lọc như Excel. Có thể kết hợp nhiều cột; mỗi CTCK hiển thị báo cáo mới nhất trong năm đã chọn.')
+    st.iframe(filterable_broker_document(visible), height='content')
 
 
 @st.cache_data(ttl=300, show_spinner=False)
