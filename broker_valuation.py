@@ -67,14 +67,14 @@ def broker_table(rows):
         url = safe_url(row['url'])
         link = f'<a class="source-link" href="{esc(url)}" target="_blank" rel="noopener noreferrer" title="{esc(row["title"])}">Mở báo cáo ↗</a>' if url else '—'
         kind = 'Valuation Report' if row['price'] is not None else 'Recommendation'
-        body.append(f'<tr><td><strong>{esc(row["broker"])}</strong></td>'
+        body.append(f'<tr data-year="{row["date"].year}" data-broker="{esc(row["broker"].casefold())}"><td><strong>{esc(row["broker"])}</strong></td>'
                     f'<td><span class="broker-kind">{kind}</span></td>'
                     f'<td class="broker-price" data-sort="{row["price"] if row["price"] is not None else ""}">{price}</td><td data-sort="{row["date"]:%Y-%m-%d}">{row["date"]:%d/%m/%Y}</td>'
                     f'<td>{esc(row["broker"])} — đăng trên Simplize</td>'
                     f'<td data-filter="{esc(recommend)}"><span class="broker-rating {tone}">{esc(recommend)}</span>'
                     f'<div class="broker-summary">{esc(row["title"])}</div></td><td>{link}</td></tr>')
-    headers = ['CTCK', 'Loại báo cáo', 'Giá mục tiêu (Target Price)', 'Ngày', 'Nguồn', 'Khuyến nghị & Giả định', 'Nguồn gốc']
-    heading = ''.join(f'<th><button type="button" data-column="{i}" aria-label="Lọc {h}" aria-expanded="false" title="Lọc giá trị trong cột">{h} <span>▾</span></button></th>' if i not in (4, 6) else f'<th>{h}</th>' for i, h in enumerate(headers))
+    headers = ['CTCK', 'Loại báo cáo', 'Giá mục tiêu', 'Tgian', 'Nguồn', 'Khuyến nghị & Giả định', 'Nguồn gốc']
+    heading = ''.join(f'<th><button type="button" data-column="{i}" aria-label="{"Sắp xếp" if i == 2 else "Lọc"} {h}" aria-expanded="false" title="{"Sắp xếp tăng/giảm" if i == 2 else "Chọn một năm" if i == 3 else "Lọc giá trị trong cột"}">{h} <span>{"↕" if i == 2 else "▾"}</span></button></th>' if i not in (4, 6) else f'<th>{h}</th>' for i, h in enumerate(headers))
     return '<div class="source-table-wrap"><table class="source-table broker-table"><thead><tr>' + heading + '</tr></thead><tbody>' + ''.join(body) + '</tbody></table></div>'
 
 
@@ -103,9 +103,24 @@ def filterable_broker_document(rows):
     button.active { color:light-dark(#4361b5,#9db6ff); }
     .filter-status { padding:10px 0; font-size:12px; }
     body { min-height:390px; }
-    </style></head><body>''' + broker_table(rows) + '''<script>
+    .source-table-wrap { max-height:650px; border-radius:14px; box-shadow:0 3px 12px #00000008; }
+    table { table-layout:fixed; min-width:1080px; }
+    th { position:sticky; top:0; z-index:2; font-size:12px; letter-spacing:.03em; padding:17px 14px; }
+    td { padding:18px 14px; line-height:1.5; }
+    th:nth-child(1) { width:85px; } th:nth-child(2) { width:125px; }
+    th:nth-child(3) { width:130px; } th:nth-child(4) { width:110px; }
+    th:nth-child(5) { width:150px; } th:nth-child(6) { width:260px; } th:nth-child(7) { width:120px; }
+    tbody tr:nth-child(even) { background:light-dark(#faf7f4,#282422); }
+    tbody tr:hover { background:light-dark(#f0f4fc,#31394a); }
+    .broker-summary { font-size:13px; opacity:1; color:light-dark(#6a625d,#c5bdb7); }
+    .broker-price { font-size:16px; font-variant-numeric:tabular-nums; }
+    .filter-status { color:light-dark(#6a625d,#c5bdb7); }
+    .filter-menu { max-height:360px; overflow:auto; }
+    </style></head><body>''' + broker_table(sorted(rows, key=lambda r: r['date'], reverse=True)) + '''<script>
     const table = document.querySelector('table'), body = table.tBodies[0];
     const rows = Array.from(body.rows), filters = new Map();
+    const years = [...new Set(rows.map(row => row.dataset.year))].sort((a,b) => Number(b)-Number(a));
+    let selectedYear = years[0], priceDirection = null;
     const status = document.createElement('div');
     status.className = 'filter-status'; table.parentElement.after(status);
     const value = (row, column) => row.cells[column].dataset.filter ?? row.cells[column].textContent.trim();
@@ -116,17 +131,26 @@ def filterable_broker_document(rows):
       menu = null; trigger = null;
     }
     function applyFilters() {
-      let count = 0;
+      let count = 0, total = 0;
+      const seen = new Set();
       rows.forEach(row => {
-        row.hidden = !Array.from(filters).every(([column, selected]) => selected.has(value(row,column)));
+        const eligible = row.dataset.year === selectedYear && !seen.has(row.dataset.broker);
+        if (eligible) { seen.add(row.dataset.broker); total++; }
+        row.hidden = !eligible || !Array.from(filters).every(([column, selected]) => selected.has(value(row,column)));
         if (!row.hidden) count++;
       });
       table.querySelectorAll('button[data-column]').forEach(button => {
+        const column = Number(button.dataset.column);
+        if (column === 2) {
+          button.querySelector('span').textContent = priceDirection === null ? '↕' : priceDirection === 'asc' ? '↑' : '↓';
+          return;
+        }
+        if (column === 3) { button.querySelector('span').textContent = selectedYear + ' ▾'; return; }
         const active = filters.has(Number(button.dataset.column));
         button.classList.toggle('active',active);
         button.querySelector('span').textContent = active ? '⏷ ●' : '▾';
       });
-      status.textContent = `Hiển thị ${count}/${rows.length} báo cáo`;
+      status.textContent = `Năm ${selectedYear} · Hiển thị ${count}/${total} CTCK · Báo cáo mới nhất của mỗi CTCK trong năm`;
       if (count === 0) status.textContent += ' — Không có báo cáo khớp các bộ lọc.';
     }
     table.querySelectorAll('button[data-column]').forEach(button => {
@@ -134,6 +158,30 @@ def filterable_broker_document(rows):
         const wasOpen = trigger === button;
         closeMenu(); if (wasOpen) return;
         const column = Number(button.dataset.column);
+        if (column === 2) {
+          priceDirection = priceDirection === 'asc' ? 'desc' : 'asc';
+          const factor = priceDirection === 'asc' ? 1 : -1;
+          [...rows].sort((a,b) => {
+            const av=a.cells[2].dataset.sort, bv=b.cells[2].dataset.sort;
+            if (av === '' || bv === '') return (av === '') - (bv === '');
+            return (Number(av)-Number(bv))*factor;
+          }).forEach(row => body.append(row));
+          button.parentElement.setAttribute('aria-sort',priceDirection === 'asc' ? 'ascending' : 'descending');
+          applyFilters(); return;
+        }
+        if (column === 3) {
+          menu = document.createElement('div'); menu.className='filter-menu';
+          menu.setAttribute('role','dialog'); menu.setAttribute('aria-label','Chọn năm');
+          const heading=document.createElement('strong'); heading.textContent='Chọn một năm'; menu.append(heading);
+          years.forEach(year => {
+            const label=document.createElement('label'), radio=document.createElement('input');
+            radio.type='radio'; radio.name='report-year'; radio.value=year; radio.checked=year===selectedYear;
+            label.append(radio,document.createTextNode(year)); menu.append(label);
+            radio.addEventListener('change',() => { selectedYear=year; applyFilters(); closeMenu(); button.focus(); });
+          });
+          trigger=button; button.setAttribute('aria-expanded','true'); document.body.append(menu);
+          positionMenu(button); menu.querySelector('input:checked').focus(); return;
+        }
         const values = [...new Set(rows.map(row => value(row,column)))];
         const selected = new Set(filters.get(column) ?? values);
         menu = document.createElement('div'); menu.className = 'filter-menu';
@@ -175,12 +223,15 @@ def filterable_broker_document(rows):
           filters.delete(column); applyFilters(); closeMenu(); button.focus();
         });
         document.body.append(menu);
-        const rect = button.getBoundingClientRect();
-        menu.style.left = Math.max(0,Math.min(rect.left,window.innerWidth-270)) + 'px';
-        menu.style.top = Math.max(0,Math.min(rect.bottom+6,window.innerHeight-menu.offsetHeight)) + 'px';
+        positionMenu(button);
         updateAll(); search.focus();
       });
     });
+    function positionMenu(button) {
+      const rect=button.getBoundingClientRect();
+      menu.style.left=Math.max(0,Math.min(rect.left,window.innerWidth-270))+'px';
+      menu.style.top=Math.max(0,Math.min(rect.bottom+6,window.innerHeight-menu.offsetHeight))+'px';
+    }
     document.addEventListener('click',event => { if (menu && !menu.contains(event.target) && !trigger.contains(event.target)) closeMenu(); });
     document.addEventListener('keydown',event => { if (event.key === 'Escape') { const button=trigger; closeMenu(); if(button) button.focus(); } });
     applyFilters();

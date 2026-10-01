@@ -36,7 +36,9 @@ class BrokerReportsTests(unittest.TestCase):
         self.assertEqual(latest_reports(rows, 2025)[0]['price'], 95000)
         self.assertEqual(latest_reports(rows)[0]['price'], 85000)
         document = filterable_broker_document(rows)
-        self.assertEqual(document.count('aria-label="Lọc '), 5)
+        self.assertEqual(document.count('aria-label="Lọc '), 4)
+        self.assertIn('aria-label="Sắp xếp Giá mục tiêu"', document)
+        self.assertIn('aria-label="Lọc Tgian"', document)
         self.assertNotIn('data-column="4"', document)
         self.assertNotIn('data-column="6"', document)
         self.assertIn('data-sort="2025-12-01"', document)
@@ -53,9 +55,7 @@ class BrokerReportsTests(unittest.TestCase):
             app.run()
             self.assertFalse(app.exception)
             self.assertEqual(len(app.text_input), 0)
-            app.selectbox(key='broker_year_FPT').select(2025).run()
-            self.assertFalse(app.exception)
-            self.assertEqual(app.selectbox(key='broker_year_FPT').value, 2025)
+            self.assertEqual(len(app.selectbox), 0)
 
 
 if __name__ == '__main__':
