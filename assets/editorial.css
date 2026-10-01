@@ -219,3 +219,10 @@ button:disabled { opacity: .55; transform: none !important; }
 [data-testid="stDataFrame"] { animation: none !important; }
 [data-testid="stFileUploader"] { border-radius: 14px; }
 @media(max-width:600px) { [role="tab"] {padding:0 10px;} [role="tab"] p {font-size:12px;} }
+/* Broker consensus reports in the valuation workspace. */
+.broker-table { min-width: 1050px; }
+.broker-table td { vertical-align: top; }
+.broker-table .broker-price { color: var(--primary-color, #4361b5); font-weight: 700; white-space: nowrap; }
+.broker-kind, .broker-rating { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 12px; background: rgba(90,120,200,.12); }
+.broker-rating.buy { color: #227451; background: rgba(60,180,120,.15); }
+.broker-summary { max-width: 320px; margin-top: 8px; font-size: 12px; line-height: 1.5; opacity: .8; }

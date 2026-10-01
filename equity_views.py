@@ -14,6 +14,33 @@ from reportlab.graphics import renderSVG
 import html
 from urllib.parse import urlparse
 from source_tables import source_table, source_link
+from broker_valuation import fetch_broker_reports, broker_table
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_broker_reports(ticker):
+    return fetch_broker_reports(ticker)
+
+
+def render_broker_valuation(ticker):
+    st.markdown(f'#### Bảng tổng hợp định giá – {ticker}')
+    st.caption('Báo cáo mới nhất của mỗi CTCK trong danh sách nguồn trả về · Simplize. Giá mục tiêu điều chỉnh theo nguồn (VND/cổ phiếu); N/A khi chưa công bố. Nội dung bên dưới là tiêu đề báo cáo; giả định chi tiết xem báo cáo gốc.')
+    query = st.text_input('Lọc CTCK, khuyến nghị…', key=f'broker_filter_{ticker}')
+    try:
+        with st.spinner('Đang tải báo cáo định giá…'):
+            rows = load_broker_reports(ticker)
+    except EquityUnavailable as exc:
+        st.info(str(exc))
+        return
+    if not rows:
+        st.info('Nguồn chưa cung cấp báo cáo phân tích cho mã này.')
+        return
+    query = query.strip().casefold()
+    visible = [r for r in rows if not query or query in ' '.join([r['broker'], r['recommend'], r['title']]).casefold()]
+    if visible:
+        st.markdown(broker_table(visible), unsafe_allow_html=True)
+    else:
+        st.info('Không có báo cáo phù hợp bộ lọc.')
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -140,6 +167,7 @@ def render_equity_valuation(bundle):
     peers = bundle["peers"]
     if not peers:
         st.info("Chưa có chỉ số định giá từ nguồn cho mã này.")
+        render_broker_valuation(bundle['ticker'])
         return
     target = peers[0]
     st.caption(f'Ngành: {target["Ngành"]} · Dữ liệu Simplize. P/E dùng lợi nhuận 12 tháng gần nhất (TTM); P/B dùng giá trị sổ sách quý gần nhất (FQ).')
@@ -149,6 +177,7 @@ def render_equity_valuation(bundle):
     st.markdown("#### So sánh doanh nghiệp cùng ngành")
     st.caption("Tối đa 10 mã đối chiếu ngoài mã đang tra, ưu tiên vốn hóa lớn trong danh sách ngành nguồn trả về; xác minh cùng mã nhóm ngành và xếp theo vốn hóa. Ngành ít mã có thể không đủ 10; đây không phải xếp hạng chất lượng đầu tư.")
     data_table(peers)
+    render_broker_valuation(bundle['ticker'])
     st.caption('EPS, BVPS và ROE còn thiếu được bổ sung từ CafeF khi có dữ liệu. Số liệu cũ không dùng để tính giá tham chiếu tương đối. Ô trống là nguồn chưa cung cấp, không thay bằng số 0.')
     notes = [r for r in peers if r.get('Kỳ số liệu bổ sung')]
     if notes:
