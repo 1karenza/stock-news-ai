@@ -14,7 +14,7 @@ from reportlab.graphics import renderSVG
 import html
 from urllib.parse import urlparse
 from source_tables import source_table, source_link
-from broker_valuation import fetch_broker_reports, broker_table
+from broker_valuation import fetch_broker_reports, latest_reports, sortable_broker_document
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -25,7 +25,6 @@ def load_broker_reports(ticker):
 def render_broker_valuation(ticker):
     st.markdown(f'#### Bảng tổng hợp định giá – {ticker}')
     st.caption('Báo cáo mới nhất của mỗi CTCK trong danh sách nguồn trả về · Simplize. Giá mục tiêu điều chỉnh theo nguồn (VND/cổ phiếu); N/A khi chưa công bố. Nội dung bên dưới là tiêu đề báo cáo; giả định chi tiết xem báo cáo gốc.')
-    query = st.text_input('Lọc CTCK, khuyến nghị…', key=f'broker_filter_{ticker}')
     try:
         with st.spinner('Đang tải báo cáo định giá…'):
             rows = load_broker_reports(ticker)
@@ -35,12 +34,13 @@ def render_broker_valuation(ticker):
     if not rows:
         st.info('Nguồn chưa cung cấp báo cáo phân tích cho mã này.')
         return
-    query = query.strip().casefold()
-    visible = [r for r in rows if not query or query in ' '.join([r['broker'], r['recommend'], r['title']]).casefold()]
-    if visible:
-        st.markdown(broker_table(visible), unsafe_allow_html=True)
-    else:
-        st.info('Không có báo cáo phù hợp bộ lọc.')
+    years = sorted({r['date'].year for r in rows}, reverse=True)
+    year = st.selectbox('Năm báo cáo', [None] + years,
+                        format_func=lambda value: 'Tất cả các năm' if value is None else str(value),
+                        key=f'broker_year_{ticker}')
+    visible = latest_reports(rows, year)
+    st.caption('Bấm tiêu đề cột để sắp xếp tăng/giảm. Cột Ngày sắp theo thời gian; mỗi CTCK hiển thị báo cáo mới nhất trong năm đã chọn.')
+    st.iframe(sortable_broker_document(visible), height='content')
 
 
 @st.cache_data(ttl=300, show_spinner=False)
