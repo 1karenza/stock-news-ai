@@ -34,7 +34,7 @@ def render_broker_valuation(ticker):
     if not rows:
         st.info('Nguồn chưa cung cấp báo cáo phân tích cho mã này.')
         return
-    st.caption('Giá mục tiêu: bấm để sắp xếp tăng/giảm. Tgian: chọn một năm. Các cột có mũi tên còn lại lọc giá trị như Excel.')
+    st.caption('Giá mục tiêu: bấm để sắp xếp tăng/giảm. Thời gian: chọn một trong 3 năm gần nhất. Các cột có mũi tên còn lại lọc giá trị như Excel.')
     st.iframe(filterable_broker_document(rows), height='content')
 
 

@@ -1,6 +1,6 @@
 import unittest
 
-from broker_valuation import parse_reports, broker_table, latest_reports, filterable_broker_document
+from broker_valuation import parse_reports, broker_table, latest_reports, filterable_broker_document, report_years, fetch_broker_reports
 from equity_data import EquityUnavailable
 
 
@@ -35,14 +35,28 @@ class BrokerReportsTests(unittest.TestCase):
         self.assertEqual(len(rows), 3)
         self.assertEqual(latest_reports(rows, 2025)[0]['price'], 95000)
         self.assertEqual(latest_reports(rows)[0]['price'], 85000)
-        document = filterable_broker_document(rows)
+        document = filterable_broker_document(rows, current_year=2026)
         self.assertEqual(document.count('aria-label="Lọc '), 4)
         self.assertIn('aria-label="Sắp xếp Giá mục tiêu"', document)
-        self.assertIn('aria-label="Lọc Tgian"', document)
+        self.assertIn('aria-label="Lọc Thời gian"', document)
         self.assertNotIn('data-column="4"', document)
         self.assertNotIn('data-column="6"', document)
         self.assertIn('data-sort="2025-12-01"', document)
         self.assertIn('data-sort="95000"', document)
+
+    def test_three_year_history_is_paginated(self):
+        from unittest.mock import patch, MagicMock
+        response = lambda data, total: MagicMock(json=lambda: {'status': 200, 'data': data, 'total': total})
+        reports = [dict(ticker='FPT', source='SSI', issueDate=f'01/09/{year}', targetPrice=year*10)
+                   for year in [2026, 2025, 2024, 2023]]
+        with patch('broker_valuation.report_years', return_value=[2026, 2025, 2024]), patch('broker_valuation.requests.Session') as session:
+            get = session.return_value.__enter__.return_value.get
+            get.side_effect = [response(reports[:1], 101), response(reports[1:], 101)]
+            rows = fetch_broker_reports('FPT')
+        self.assertEqual([r['date'].year for r in rows], [2026, 2025, 2024])
+        self.assertEqual(get.call_count, 2)
+        self.assertEqual(get.call_args.kwargs['params']['page'], 1)
+        self.assertEqual(report_years(2026), [2026, 2025, 2024])
 
     def test_year_control_without_broker_text_filter(self):
         from unittest.mock import patch

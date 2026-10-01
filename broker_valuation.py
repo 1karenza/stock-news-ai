@@ -1,11 +1,10 @@
 """Ticker-bound public broker reports, retaining source provenance."""
 import html
-import json
 import math
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
-from bs4 import BeautifulSoup
 
 from equity_data import EquityUnavailable, valid_ticker, text_only
 from investor_events import safe_url
@@ -44,15 +43,36 @@ def latest_reports(rows, year=None):
     return list(latest.values())
 
 
+def report_years(current_year=None):
+    year = current_year if current_year is not None else datetime.now(ZoneInfo('Asia/Bangkok')).year
+    return [year, year - 1, year - 2]
+
+
 def fetch_broker_reports(ticker):
     ticker = valid_ticker(ticker)
+    years = report_years()
+    rows = []
     try:
-        response = requests.get(f'https://simplize.vn/co-phieu/{ticker}/bao-cao',
-                                headers={'User-Agent': 'Mozilla/5.0'}, timeout=(5, 20))
-        response.raise_for_status()
-        node = BeautifulSoup(response.text, 'html.parser').find('script', id='__NEXT_DATA__')
-        data = json.loads(node.string)['props']['pageProps']
-        return parse_reports(data, ticker, latest_only=False)
+        with requests.Session() as session:
+            for page in range(20):
+                response = session.get('https://api.simplize.vn/api/company/analysis-report/list',
+                                       params={'ticker': ticker, 'page': page, 'size': 100, 'isWl': 'false'},
+                                       headers={'User-Agent': 'Mozilla/5.0'}, timeout=(5, 20))
+                response.raise_for_status()
+                payload = response.json()
+                if payload.get('status') != 200 or not isinstance(payload.get('data'), list):
+                    raise ValueError('Dữ liệu báo cáo không hợp lệ')
+                raw = payload['data']
+                parsed = parse_reports({'ticker': ticker, 'analysisReports': raw}, ticker, latest_only=False)
+                rows.extend(r for r in parsed if r['date'].year in years)
+                if not raw or (isinstance(payload.get('total'), int) and (page + 1) * 100 >= payload['total']):
+                    break
+                # The public endpoint lists reports newest first.
+                if parsed and min(r['date'].year for r in parsed) < years[-1]:
+                    break
+            else:
+                raise ValueError('Lịch sử báo cáo vượt giới hạn tải')
+        return sorted(rows, key=lambda r: r['date'], reverse=True)
     except (requests.RequestException, ValueError, TypeError, KeyError, AttributeError) as exc:
         raise EquityUnavailable(f'Chưa tải được báo cáo định giá {ticker} từ Simplize.') from exc
 
@@ -73,12 +93,14 @@ def broker_table(rows):
                     f'<td>{esc(row["broker"])} — đăng trên Simplize</td>'
                     f'<td data-filter="{esc(recommend)}"><span class="broker-rating {tone}">{esc(recommend)}</span>'
                     f'<div class="broker-summary">{esc(row["title"])}</div></td><td>{link}</td></tr>')
-    headers = ['CTCK', 'Loại báo cáo', 'Giá mục tiêu', 'Tgian', 'Nguồn', 'Khuyến nghị & Giả định', 'Nguồn gốc']
+    headers = ['CTCK', 'Loại báo cáo', 'Giá mục tiêu', 'Thời gian', 'Nguồn', 'Khuyến nghị & Giả định', 'Nguồn gốc']
     heading = ''.join(f'<th><button type="button" data-column="{i}" aria-label="{"Sắp xếp" if i == 2 else "Lọc"} {h}" aria-expanded="false" title="{"Sắp xếp tăng/giảm" if i == 2 else "Chọn một năm" if i == 3 else "Lọc giá trị trong cột"}">{h} <span>{"↕" if i == 2 else "▾"}</span></button></th>' if i not in (4, 6) else f'<th>{h}</th>' for i, h in enumerate(headers))
     return '<div class="source-table-wrap"><table class="source-table broker-table"><thead><tr>' + heading + '</tr></thead><tbody>' + ''.join(body) + '</tbody></table></div>'
 
 
-def filterable_broker_document(rows):
+def filterable_broker_document(rows, current_year=None):
+    years = report_years(current_year)
+    rows = [r for r in rows if r['date'].year in years]
     return '''<!doctype html><html lang="vi"><head><meta charset="utf-8"><style>
     :root { color-scheme: light dark; }
     body { margin:0; font:14px Arial,sans-serif; color:light-dark(#292524,#e8e3e0); background:transparent; }
@@ -116,10 +138,11 @@ def filterable_broker_document(rows):
     .broker-price { font-size:16px; font-variant-numeric:tabular-nums; }
     .filter-status { color:light-dark(#6a625d,#c5bdb7); }
     .filter-menu { max-height:360px; overflow:auto; }
-    </style></head><body>''' + broker_table(sorted(rows, key=lambda r: r['date'], reverse=True)) + '''<script>
+    </style></head><body data-current-year="''' + str(years[0]) + '''">''' + broker_table(sorted(rows, key=lambda r: r['date'], reverse=True)) + '''<script>
     const table = document.querySelector('table'), body = table.tBodies[0];
     const rows = Array.from(body.rows), filters = new Map();
-    const years = [...new Set(rows.map(row => row.dataset.year))].sort((a,b) => Number(b)-Number(a));
+    const currentYear = Number(document.body.dataset.currentYear);
+    const years = [currentYear, currentYear-1, currentYear-2].map(String);
     let selectedYear = years[0], priceDirection = null;
     const status = document.createElement('div');
     status.className = 'filter-status'; table.parentElement.after(status);
