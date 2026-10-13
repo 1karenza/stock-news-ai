@@ -45,7 +45,7 @@ def report_calendar_rows(bundle, calendar_month=None):
     return month, [r for r in bundle['events'] if r['Ngày'][:7] == month]
 
 
-def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
+def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None, broker_reports=None):
     if FONT not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont(FONT, str(Path(__file__).parent/'assets/fonts/DejaVuSans.ttf')))
     output = BytesIO()
@@ -142,6 +142,21 @@ def build_pdf(bundle, news_rows, searched_tickers, calendar_month=None):
     story.append(p('EPS × trung vị P/E hoặc BVPS × trung vị P/B của các mã đối chiếu; loại mã đang tra và bội số không dương, cần ít nhất 2 mã. Không phải khuyến nghị đầu tư.'))
     grid(bundle['relative'])
     story.append(p('Chỉ số thấp chưa đủ để kết luận cổ phiếu rẻ.'))
+    section(f'V / Báo cáo định giá CTCK - {bundle["ticker"]}')
+    story.append(p('Báo cáo mới nhất của mỗi công ty chứng khoán trong ba năm gần nhất theo Simplize. Giá mục tiêu theo nguồn (VND/cổ phiếu); N/A khi chưa công bố. Nội dung là tiêu đề báo cáo; xem báo cáo gốc để biết giả định chi tiết.'))
+    broker_cols=['CTCK','Loại báo cáo','Giá mục tiêu (VND/CP)','Ngày','Nguồn','Khuyến nghị & giả định']
+    broker_rows=[]
+    for row in (broker_reports or []):
+        price=row.get('price')
+        price_text=f'{price:,.0f}'.replace(',', '.')+' VND' if price is not None else 'N/A'
+        published=row.get('date')
+        date_text=published.strftime('%d/%m/%Y') if hasattr(published,'strftime') else str(published or '—')
+        broker_rows.append({'CTCK':row.get('broker'),'Loại báo cáo':'Valuation Report' if price is not None else 'Recommendation',
+            'Giá mục tiêu (VND/CP)':price_text,'Ngày':date_text,
+            'Nguồn':f"{row.get('broker')} — đăng trên Simplize",
+            'Khuyến nghị & giả định':' · '.join(filter(None,[row.get('recommend'),row.get('title')])) or 'Chưa công bố'})
+    grid(broker_rows,[12,17,17,13,19,34])
+    story.append(p('Nguồn gốc: Simplize. Báo cáo gốc được liên kết trong bảng trên giao diện; PDF ghi lại thông tin báo cáo và tiêu đề.'))
     def footer(canvas,document):
         canvas.setFont(FONT,8); canvas.setFillColor(ROSE)
         canvas.drawString(32,18,f'Stock News | {bundle["ticker"]} | {now}')

@@ -21,6 +21,7 @@ from investor_profile import (get_profile, persist_profile, watchlist_selector, 
                               article_controls, article_id, mark_seen, changed)
 from equity_views import load_equity, render_equity_prices, render_equity_calendar, render_equity_valuation
 from equity_pdf import build_pdf
+from equity_views import load_broker_reports
 from investor_profile import parse_tickers
 
 load_dotenv()
@@ -832,7 +833,8 @@ if selected_ticker:
     with report_slot.container():
         report_rows = [make_table_row(item) for item in all_merged]
         st.download_button("",
-                           build_pdf(equity, report_rows, tickers, calendar_month=calendar_month),
+                           build_pdf(equity, report_rows, tickers, calendar_month=calendar_month,
+                                     broker_reports=load_broker_reports(selected_ticker)),
                            file_name=f"stock-news-{selected_ticker}.pdf",
                            mime="application/pdf", width="stretch", icon=":material/download:", help="Tải báo cáo", key="report_pdf")
 else:
